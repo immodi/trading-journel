@@ -1,0 +1,49 @@
+#################################
+# OS / IDE
+#################################
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+#################################
+# .NET (Backend)
+#################################
+backend/Api/bin/
+backend/Api/obj/
+**/bin/
+**/obj/
+
+# Publish outputs (IMPORTANT)
+backend/Api/bin/Release/
+backend/Api/bin/Debug/
+backend/Api/publish/
+
+#################################
+# ASP.NET Core
+#################################
+appsettings.Development.json
+wwwroot/
+
+#################################
+# Frontend (React / Vite)
+#################################
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# env files
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+
+#################################
+# Logs
+#################################
+*.log
+
+#################################
+# Optional (if using Rider)
+#################################
+.idea/

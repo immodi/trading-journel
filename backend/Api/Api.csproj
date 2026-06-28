@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.7"/>
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="wwwroot\" />
+    </ItemGroup>
+    
+    <Target Name="BuildFrontend" BeforeTargets="Publish">
+        <Exec WorkingDirectory="../../frontend" Command="pnpm build" />
+
+        <ItemGroup>
+            <FrontendFiles Include="../../frontend/dist/**" />
+        </ItemGroup>
+
+        <Copy
+                SourceFiles="@(FrontendFiles)"
+                DestinationFiles="@(FrontendFiles->'$(PublishDir)wwwroot/%(RecursiveDir)%(Filename)%(Extension)')" />
+    </Target>
+</Project>

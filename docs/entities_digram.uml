@@ -1,0 +1,89 @@
+@startuml
+hide circle
+skinparam linetype ortho
+
+entity "User" as User {
+  * Id : uniqueidentifier
+  --
+  Username : nvarchar
+  Email : nvarchar
+  PasswordHash : nvarchar
+  CreatedAt : datetime
+}
+
+entity "Trade" as Trade {
+  * Id : uniqueidentifier
+  --
+  UserId : FK
+
+  Instrument : nvarchar
+  Direction : enum
+  EntryPrice : decimal
+  ExitPrice : decimal
+  Quantity : decimal
+
+  EntryTime : datetime
+  ExitTime : datetime
+
+  Commission : decimal
+  ProfitLoss : decimal
+
+  CreatedAt : datetime
+  UpdatedAt : datetime
+}
+
+entity "TradeNote" as Note {
+  * Id : uniqueidentifier
+  --
+  TradeId : FK
+
+  Content : nvarchar(max)
+  CreatedAt : datetime
+}
+
+entity "Screenshot" as Screenshot {
+  * Id : uniqueidentifier
+  --
+  TradeId : FK
+
+  FileName : nvarchar
+  FilePath : nvarchar
+  UploadedAt : datetime
+}
+
+entity "Tag" as Tag {
+  * Id : uniqueidentifier
+  --
+  UserId : FK
+
+  Name : nvarchar
+  Color : nvarchar
+}
+
+entity "TradeTag" as TradeTag {
+  * TradeId : FK
+  * TagId : FK
+}
+
+entity "ImportHistory" as ImportHistory {
+  * Id : uniqueidentifier
+  --
+  UserId : FK
+
+  FileName : nvarchar
+  ImportedTrades : int
+  FailedTrades : int
+  ImportedAt : datetime
+}
+
+User ||--o{ Trade
+User ||--o{ Tag
+User ||--o{ ImportHistory
+
+Trade ||--o{ Note
+Trade ||--o{ Screenshot
+
+Trade ||--o{ TradeTag
+Tag ||--o{ TradeTag
+
+@enduml
