@@ -1,0 +1,29 @@
+name: .NET Tests
+
+on:
+  push:
+    branches: [ "main", "develop", "feature/**" ]
+  pull_request:
+    branches: [ "main", "develop" ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore dependencies
+        run: dotnet restore backend/backend.sln
+
+      - name: Build solution
+        run: dotnet build backend/backend.sln --no-restore --configuration Release
+
+      - name: Run tests
+        run: dotnet test backend/backend.sln --no-build --configuration Release --verbosity normal

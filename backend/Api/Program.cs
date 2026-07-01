@@ -1,4 +1,5 @@
 using Api.Extensions;
+using Infrastructure;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,8 +14,7 @@ public class Program
         builder.Services.AddAuthorization();
         builder.Services.AddControllers();
         builder.Services.AddOpenApi();
-        builder.Services.AddDbContext<AppDbContext>(options =>
-            options.UseSqlite(builder.Configuration.GetConnectionString("Default")));
+        builder.Services.AddInfrastructure(builder.Configuration);
 
         builder.Logging.AddConsole();
         builder.Logging.AddDebug();

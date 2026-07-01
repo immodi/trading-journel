@@ -47,3 +47,5 @@ frontend/.env.*
 # Optional (if using Rider)
 #################################
 .idea/
+
+backend.sln.*
