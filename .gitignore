@@ -49,3 +49,5 @@ frontend/.env.*
 .idea/
 
 backend.sln.*
+
+db.db

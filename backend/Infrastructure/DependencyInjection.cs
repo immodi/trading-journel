@@ -1,6 +1,8 @@
 using Application.Interfaces.Repositories;
+using Application.Interfaces.Services;
 using Infrastructure.Persistence;
 using Infrastructure.Persistence.Repositories;
+using Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,6 +24,10 @@ public static class DependencyInjection
         services.AddScoped<ITradeRepository, TradeRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
 
+        services.AddScoped<ITradeService, TradeService>();
+        services.AddScoped<IUserService, UserService>();
+        services.AddScoped<IPasswordHasher, PasswordHasher>();
+        
         return services;
     }
 }
