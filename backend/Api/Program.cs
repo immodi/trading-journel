@@ -1,3 +1,8 @@
+using Api.Extensions;
+using Infrastructure;
+using Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+
 namespace Api;
 
 public class Program
@@ -9,6 +14,7 @@ public class Program
         builder.Services.AddAuthorization();
         builder.Services.AddControllers();
         builder.Services.AddOpenApi();
+        builder.Services.AddInfrastructure(builder.Configuration);
 
         builder.Logging.AddConsole();
         builder.Logging.AddDebug();
@@ -19,7 +25,8 @@ public class Program
         {
             app.MapOpenApi();
         }
-
+        
+        app.ApplyMigrations();
         app.UseHttpsRedirection();
         app.UseAuthorization();
         app.UseDefaultFiles();
@@ -29,4 +36,7 @@ public class Program
      
         app.Run();
     }
+    
+    
+        
 }
