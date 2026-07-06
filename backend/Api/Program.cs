@@ -15,7 +15,8 @@ public class Program
         builder.Services.AddControllers();
         builder.Services.AddOpenApi();
         builder.Services.AddInfrastructure(builder.Configuration);
-
+        builder.Services.AddJwtAuthentication(builder.Configuration);
+        
         builder.Logging.AddConsole();
         builder.Logging.AddDebug();
 
@@ -25,13 +26,14 @@ public class Program
         {
             app.MapOpenApi();
         }
-        
+
         app.ApplyMigrations();
         app.UseHttpsRedirection();
-        app.UseAuthorization();
         app.UseDefaultFiles();
         app.UseStaticFiles(); 
         
+        app.UseAuthentication();
+        app.UseAuthorization();
         app.MapControllers();
      
         app.Run();

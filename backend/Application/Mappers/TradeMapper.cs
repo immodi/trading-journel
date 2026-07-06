@@ -12,9 +12,15 @@ public static class TradeMapper
             return new TradeDto
             {
                 Id = trade.Id,
+                UserId = trade.UserId,
                 Instrument = trade.Instrument,
+                EntryTime = trade.EntryTime,
+                ExitTime = trade.ExitTime,
+                Commission = trade.Commission,
                 Direction = trade.Direction,
                 EntryPrice = trade.EntryPrice,
+                CreatedAt = trade.CreatedAt,
+                UpdatedAt = trade.UpdatedAt,
                 ExitPrice = trade.ExitPrice,
                 Quantity = trade.Quantity,
                 ProfitLoss = trade.ProfitLoss

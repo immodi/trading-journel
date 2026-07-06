@@ -1,10 +1,12 @@
 using Application.Interfaces.Services;
 using Application.Requests.User;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Api.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/[controller]")]
 public class UserController(IUserService userService) : ControllerBase
 {

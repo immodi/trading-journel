@@ -21,6 +21,7 @@ public class TradeDto
 
     public decimal Commission { get; init; }
     public decimal ProfitLoss { get; init; }
+    
     public DateTime CreatedAt { get; init; }
     public DateTime UpdatedAt { get; init; }
 }

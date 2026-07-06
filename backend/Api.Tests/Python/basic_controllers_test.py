@@ -11,8 +11,12 @@ port = sys.argv[1]
 
 TRADE_URL = f"http://localhost:{port}/api/trade"
 USER_URL = f"http://localhost:{port}/api/user"
+AUTH_URL = f"http://localhost:{port}/api/auth"
 
 
+# -----------------------------
+# HTTP helper
+# -----------------------------
 def print_response(response):
     print(f"Status: {response.status}")
     body = response.read().decode()
@@ -26,7 +30,7 @@ def print_response(response):
     print("-" * 60)
 
 
-def request(base_url, method, path="", payload=None):
+def request(base_url, method, path="", payload=None, token=None):
     url = base_url + path
 
     data = None
@@ -36,6 +40,9 @@ def request(base_url, method, path="", payload=None):
         data = json.dumps(payload).encode()
         headers["Content-Type"] = "application/json"
 
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
     req = Request(url, data=data, headers=headers, method=method)
 
     with urlopen(req) as response:
@@ -43,8 +50,11 @@ def request(base_url, method, path="", payload=None):
         print_response(response)
 
 
-def create_user():
-    print("CREATE USER")
+# -----------------------------
+# AUTH
+# -----------------------------
+def register_user():
+    print("\nREGISTER USER")
 
     payload = {
         "username": "johndoe",
@@ -52,24 +62,68 @@ def create_user():
         "password": "Password123!"
     }
 
-    request(USER_URL, "POST", payload=payload)
+    req = Request(
+        f"{AUTH_URL}/register",
+        data=json.dumps(payload).encode(),
+        headers={"Content-Type": "application/json"},
+        method="POST"
+    )
 
-    # assuming first user = 1 (simple dev assumption)
-    return 1
+    with urlopen(req) as response:
+        body = json.loads(response.read().decode())
+        print_response(response)
+        return body["token"]
 
 
-def test_users():
+def test_auth():
+    print("\nLOGIN")
+
+    request(AUTH_URL, "POST", "/login", {
+        "email": "john.doe@example.com",
+        "password": "Password123!"
+    })
+
+    print("\nLOGIN WITH INVALID PASSWORD")
+    try:
+        request(AUTH_URL, "POST", "/login", {
+            "email": "john.doe@example.com",
+            "password": "WrongPassword"
+        })
+    except HTTPError as e:
+        print(f"Status: {e.code}")
+        print(e.read().decode())
+        print("-" * 60)
+
+    print("\nLOGIN WITH UNKNOWN EMAIL")
+    try:
+        request(AUTH_URL, "POST", "/login", {
+            "email": "doesnotexist@example.com",
+            "password": "Password123!"
+        })
+    except HTTPError as e:
+        print(f"Status: {e.code}")
+        print(e.read().decode())
+        print("-" * 60)
+
+
+# -----------------------------
+# USERS (PROTECTED)
+# -----------------------------
+def test_users(token):
     print("\nGET USERS")
-    request(USER_URL, "GET")
+    request(USER_URL, "GET", token=token)
 
     print("\nGET USER BY ID")
-    request(USER_URL, "GET", "/1")
+    request(USER_URL, "GET", "/1", token=token)
 
 
-def test_trades():
+# -----------------------------
+# TRADES (PROTECTED)
+# -----------------------------
+def test_trades(token):
     print("\nCREATE TRADE")
 
-    request(TRADE_URL, "POST", payload={
+    request(TRADE_URL, "POST", token=token, payload={
         "userId": 1,
         "instrument": "MNQ SEP26",
         "direction": 0,
@@ -82,32 +136,30 @@ def test_trades():
     })
 
     print("\nGET TRADES")
-    request(TRADE_URL, "GET")
+    request(TRADE_URL, "GET", token=token)
 
     print("\nGET TRADE BY ID")
-    request(TRADE_URL, "GET", "/1")
+    request(TRADE_URL, "GET", "/1", token=token)
 
     print("\nUPDATE TRADE")
-    request(TRADE_URL, "PUT", "/1", {
+    request(TRADE_URL, "PUT", "/1", token=token, payload={
         "exitPrice": 23500.00,
         "commission": 5.0
     })
 
-    print("\nGET TRADE AFTER UPDATE")
-    request(TRADE_URL, "GET", "/1")
-
     print("\nDELETE TRADE")
-    request(TRADE_URL, "DELETE", "/1")
-
-    print("\nGET TRADES AFTER DELETE")
-    request(TRADE_URL, "GET")
+    request(TRADE_URL, "DELETE", "/1", token=token)
 
 
+# -----------------------------
+# MAIN
+# -----------------------------
 def main():
-    user_id = create_user()
+    token = register_user()
 
-    test_users()
-    test_trades()
+    test_auth()
+    test_users(token)
+    test_trades(token)
 
 
 if __name__ == "__main__":
