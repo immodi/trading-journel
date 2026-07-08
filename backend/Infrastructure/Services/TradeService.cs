@@ -11,8 +11,7 @@ public class TradeService(ITradeRepository repository) : ITradeService
     public async Task<IEnumerable<TradeDto>> GetAllAsync()
     {
         var trades = await repository.GetAllAsync();
-        var dtos = trades.Select(t => t.ToDto()).ToList();
-        return dtos;
+        return trades.Select(t => t.ToDto());
     }
 
     public async Task<TradeDto?> GetByIdAsync(int id)
