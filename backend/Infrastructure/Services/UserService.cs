@@ -11,8 +11,7 @@ public class UserService(IUserRepository repository, IPasswordHasher passwordHas
     public async Task<IEnumerable<UserDto>> GetAllAsync()
     {
         var users = await repository.GetAllAsync();
-        var dtos = users.Select(t => t.ToDto()).ToList();
-        return dtos;
+        return users.Select(t => t.ToDto());
     }
 
     public async Task<UserDto?> GetByIdAsync(int id)
