@@ -1,5 +1,6 @@
 using Application.Interfaces.Services;
 using Application.Requests.User;
+using Application.Responses;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -23,7 +24,8 @@ public class UserController(IUserService userService) : ControllerBase
         var user = await userService.GetByIdAsync(id);
 
         if (user is null)
-            return NotFound();
+            return NotFound(
+                new ErrorResponse(404, "User not found"));
 
         return Ok(user);
     }

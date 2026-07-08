@@ -1,5 +1,7 @@
 using Application.Interfaces.Services;
 using Application.Requests.Auth;
+using Application.Responses;
+using Application.Responses.Auth;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Api.Controllers;
@@ -14,9 +16,10 @@ public class AuthController(IAuthService authService) : ControllerBase
         var token = await authService.LoginAsync(request);
 
         if (token is null)
-            return Unauthorized("Invalid email or password.");
+            return Unauthorized(
+                new ErrorResponse(401, "Invalid email or password."));
 
-        return Ok(new
+        return Ok(new AuthResponse
         {
             Token = token
         });
@@ -28,14 +31,17 @@ public class AuthController(IAuthService authService) : ControllerBase
         var user = await authService.RegisterAsync(request);
 
         if (user is null)
-            return Unauthorized("An error occured while registering the user");
+            return Unauthorized(
+                new ErrorResponse(401, "An error occured while registering the user"));
         
-        var token = await authService.LoginAsync(new LoginRequest{Email = request.Email, Password = request.Password});
+        var token = await authService.LoginAsync(
+            new LoginRequest{Email = request.Email, Password = request.Password});
 
         if (token is null)
-            return Unauthorized("Error occured while logging in the user");
+            return Unauthorized(
+                new ErrorResponse(401, "Error occured while logging in the user"));
 
-        return Ok(new
+        return Ok(new AuthResponse
         {
             Token = token
         });

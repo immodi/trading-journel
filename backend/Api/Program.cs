@@ -1,3 +1,4 @@
+using Api.Exceptions;
 using Api.Extensions;
 using Infrastructure;
 using Infrastructure.Persistence;
@@ -19,14 +20,18 @@ public class Program
         
         builder.Logging.AddConsole();
         builder.Logging.AddDebug();
-
+        
+        builder.Services.AddExceptionHandler<ExceptionHandler>();
+        
         var app = builder.Build();
 
         if (app.Environment.IsDevelopment())
         {
             app.MapOpenApi();
         }
-
+        
+        app.UseExceptionHandler();
+        
         app.ApplyMigrations();
         app.UseHttpsRedirection();
         app.UseDefaultFiles();
