@@ -15,6 +15,5 @@ public class CreateTradeRequest
 
     public required DateTime EntryTime { get; init; }
     public required DateTime ExitTime { get; init; }
-
-    public required decimal Commission { get; init; }
+    // public required decimal Commission { get; init; }
 }

@@ -103,7 +103,6 @@ public class TradeServiceTests
             Quantity = 1,
             EntryTime = DateTime.UtcNow,
             ExitTime = DateTime.UtcNow,
-            Commission = 1,
         };
 
         // Act

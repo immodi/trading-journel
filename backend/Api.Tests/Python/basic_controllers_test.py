@@ -132,7 +132,6 @@ def test_trades(token):
         "quantity": 2,
         "entryTime": "2026-07-05T10:00:00Z",
         "exitTime": "2026-07-05T10:15:00Z",
-        "commission": 4.2
     })
 
     print("\nGET TRADES")

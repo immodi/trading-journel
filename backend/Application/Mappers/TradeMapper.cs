@@ -16,7 +16,7 @@ public static class TradeMapper
                 Instrument = trade.Instrument,
                 EntryTime = trade.EntryTime,
                 ExitTime = trade.ExitTime,
-                Commission = trade.Commission,
+                Commission = new decimal(1.82) * trade.Quantity,
                 Direction = trade.Direction,
                 EntryPrice = trade.EntryPrice,
                 CreatedAt = trade.CreatedAt,
@@ -29,6 +29,7 @@ public static class TradeMapper
 
         public static Trade ToEntity(this CreateTradeRequest request)
         {
+            var commission = new decimal(1.82) * request.Quantity;
             return new Trade
             {
                 Instrument = request.Instrument,
@@ -39,13 +40,13 @@ public static class TradeMapper
                 Quantity = request.Quantity,
                 EntryTime = request.EntryTime,
                 ExitTime = request.ExitTime,
-                Commission = request.Commission,
+                Commission = commission,
                 ProfitLoss = CalculateProfitLoss(
                     request.Direction, 
                     request.EntryPrice, 
                     request.ExitPrice, 
                     request.Quantity, 
-                    request.Commission)
+                    commission)
             };
         }
         
