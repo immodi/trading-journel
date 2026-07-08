@@ -2,7 +2,4 @@ using Domain.Entities;
 
 namespace Application.Interfaces.Repositories;
 
-public interface ITradeRepository : IRepository<Trade>
-{
-    
-}
+public interface ITradeRepository : IRepository<Trade>;
