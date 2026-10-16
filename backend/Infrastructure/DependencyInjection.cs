@@ -27,9 +27,11 @@ public static class DependencyInjection
 
         services.AddScoped<ITradeRepository, TradeRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IMarketRepository, MarketRepository>();
         
         services.AddScoped<ITradeService, TradeService>();
         services.AddScoped<IUserService, UserService>();
+        services.AddScoped<IMarketService, MarketService>();
         services.AddScoped<IPasswordHasher, PasswordHasher>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IJwtTokenService>(_ => new JwtTokenService(configuration)); 

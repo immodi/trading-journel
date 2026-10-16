@@ -1,9 +1,11 @@
-import { useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { Loader2 } from "lucide-react";
 import { Direction, DIRECTION_LABELS, type CreateTradeInput, type Trade } from "@/types/models";
 import { useCreateTrade, useUpdateTrade } from "@/hooks/useTrades";
+import { useMarkets } from "@/hooks/useMarkets";
 import { getErrorMessage } from "@/api/client";
 import { fromDateTimeLocal, nowAsDateTimeLocal, toDateTimeLocal } from "@/lib/datetime";
+import { formatCurrency } from "@/lib/format";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,6 +34,7 @@ interface TradeFormDialogProps {
 }
 
 interface FormState {
+    marketId: string;
     instrument: string;
     direction: number;
     quantity: string;
@@ -39,7 +42,7 @@ interface FormState {
     exitPrice: string;
     entryTime: string;
     exitTime: string;
-    commission: string;
+    commissionPerUnit: string;
 }
 
 const DIRECTION_ITEMS = {
@@ -47,38 +50,25 @@ const DIRECTION_ITEMS = {
     [Direction.Short]: DIRECTION_LABELS[Direction.Short],
 };
 
-/**
- * Per-unit commission applied by the API when a trade is submitted without an
- * explicit commission (mirrors `TradeMapper.CommissionPerUnit`). Shown here so
- * the default is visible and editable.
- */
-const DEFAULT_COMMISSION_PER_UNIT = 1.82;
-
-function defaultCommission(quantity: string): string {
-    const parsed = Number(quantity);
-
-    if (!Number.isInteger(parsed) || parsed <= 0) return "";
-
-    return (DEFAULT_COMMISSION_PER_UNIT * parsed).toFixed(2);
-}
+const DEFAULT_COMMISSION_PER_UNIT = "0";
 
 function initialForm(trade?: Trade | null): FormState {
     if (!trade) {
-        const quantity = "1";
-
         return {
+            marketId: "",
             instrument: "",
             direction: Direction.Long,
-            quantity,
+            quantity: "1",
             entryPrice: "",
             exitPrice: "",
             entryTime: nowAsDateTimeLocal(),
             exitTime: nowAsDateTimeLocal(),
-            commission: defaultCommission(quantity),
+            commissionPerUnit: DEFAULT_COMMISSION_PER_UNIT,
         };
     }
 
     return {
+        marketId: String(trade.marketId),
         instrument: trade.instrument,
         direction: trade.direction,
         quantity: String(trade.quantity),
@@ -86,7 +76,7 @@ function initialForm(trade?: Trade | null): FormState {
         exitPrice: String(trade.exitPrice),
         entryTime: toDateTimeLocal(trade.entryTime),
         exitTime: toDateTimeLocal(trade.exitTime),
-        commission: trade.commission.toFixed(2),
+        commissionPerUnit: String(trade.commissionPerUnit),
     };
 }
 
@@ -94,44 +84,61 @@ export function TradeFormDialog({ open, onOpenChange, trade }: TradeFormDialogPr
     const isEditing = Boolean(trade);
     const createTrade = useCreateTrade();
     const updateTrade = useUpdateTrade();
+    const { data: markets = [] } = useMarkets();
     const isSaving = createTrade.isPending || updateTrade.isPending;
 
     const [form, setForm] = useState<FormState>(() => initialForm(trade));
     const [error, setError] = useState("");
-    // Once the commission is edited by hand it stops tracking the quantity.
-    const [commissionEdited, setCommissionEdited] = useState(isEditing);
+
+    const marketItems = useMemo(
+        () =>
+            Object.fromEntries(
+                markets.map((market) => [
+                    String(market.id),
+                    `${market.name} (${market.currency})`,
+                ])
+            ),
+        [markets]
+    );
+
+    // Default to the first market once the list is available without needing
+    // to sync it into state (which would trigger a cascading render).
+    const effectiveMarketId =
+        form.marketId || (markets.length > 0 ? String(markets[0].id) : "");
 
     function update<K extends keyof FormState>(key: K, value: FormState[K]) {
         setForm((previous) => ({ ...previous, [key]: value }));
     }
 
-    function updateQuantity(value: string) {
-        setForm((previous) => ({
-            ...previous,
-            quantity: value,
-            commission: commissionEdited ? previous.commission : defaultCommission(value),
-        }));
-    }
+    const selectedMarket = markets.find(
+        (market) => String(market.id) === effectiveMarketId
+    );
 
-    function updateCommission(value: string) {
-        setCommissionEdited(true);
-        update("commission", value);
-    }
+    const quantity = Number(form.quantity);
+    const commissionPerUnit = Number(form.commissionPerUnit);
+    const totalCommission =
+        Number.isFinite(quantity) && Number.isFinite(commissionPerUnit) && quantity > 0
+            ? quantity * commissionPerUnit
+            : 0;
 
     async function handleSubmit(event: FormEvent) {
         event.preventDefault();
 
-        const quantity = Number(form.quantity);
+        const quantityValue = Number(form.quantity);
         const entryPrice = Number(form.entryPrice);
         const exitPrice = Number(form.exitPrice);
-        const commission =
-            form.commission.trim() === "" ? undefined : Number(form.commission);
+        const marketId = Number(effectiveMarketId);
+        const perUnit = form.commissionPerUnit.trim() === "" ? 0 : Number(form.commissionPerUnit);
 
+        if (!effectiveMarketId || !Number.isInteger(marketId)) {
+            setError("Select a market for this trade.");
+            return;
+        }
         if (!form.instrument.trim()) {
             setError("Instrument is required.");
             return;
         }
-        if (!Number.isInteger(quantity) || quantity <= 0) {
+        if (!Number.isInteger(quantityValue) || quantityValue <= 0) {
             setError("Quantity must be a whole number greater than zero.");
             return;
         }
@@ -143,8 +150,8 @@ export function TradeFormDialog({ open, onOpenChange, trade }: TradeFormDialogPr
             setError("Exit price must be a non-negative number.");
             return;
         }
-        if (commission !== undefined && (!Number.isFinite(commission) || commission < 0)) {
-            setError("Commission must be a non-negative number.");
+        if (!Number.isFinite(perUnit) || perUnit < 0) {
+            setError("Commission per unit must be a non-negative number.");
             return;
         }
         if (!form.entryTime || !form.exitTime) {
@@ -157,14 +164,15 @@ export function TradeFormDialog({ open, onOpenChange, trade }: TradeFormDialogPr
         }
 
         const input: CreateTradeInput = {
+            marketId,
             instrument: form.instrument.trim().toUpperCase(),
             direction: form.direction as Direction,
-            quantity,
+            quantity: quantityValue,
             entryPrice,
             exitPrice,
             entryTime: fromDateTimeLocal(form.entryTime),
             exitTime: fromDateTimeLocal(form.exitTime),
-            ...(commission !== undefined ? { commission } : {}),
+            commissionPerUnit: perUnit,
         };
 
         try {
@@ -180,6 +188,8 @@ export function TradeFormDialog({ open, onOpenChange, trade }: TradeFormDialogPr
         }
     }
 
+    const noMarkets = markets.length === 0;
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-lg">
@@ -191,7 +201,38 @@ export function TradeFormDialog({ open, onOpenChange, trade }: TradeFormDialogPr
                 </DialogHeader>
 
                 <form onSubmit={handleSubmit} className="grid gap-4">
+                    {noMarkets && (
+                        <Alert>
+                            <AlertDescription>
+                                You need a market before logging a trade. Create one from the
+                                Markets page.
+                            </AlertDescription>
+                        </Alert>
+                    )}
+
                     <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="grid gap-2">
+                            <Label htmlFor="market">Market</Label>
+                            <Select
+                                items={marketItems}
+                                value={effectiveMarketId}
+                                onValueChange={(value) =>
+                                    update("marketId", value as string)
+                                }
+                            >
+                                <SelectTrigger id="market" className="w-full">
+                                    <SelectValue placeholder="Select a market" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {markets.map((market) => (
+                                        <SelectItem key={market.id} value={String(market.id)}>
+                                            {market.name} ({market.currency})
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
                         <div className="grid gap-2">
                             <Label htmlFor="instrument">Instrument</Label>
                             <Input
@@ -233,7 +274,7 @@ export function TradeFormDialog({ open, onOpenChange, trade }: TradeFormDialogPr
                                 min="1"
                                 step="1"
                                 value={form.quantity}
-                                onChange={(event) => updateQuantity(event.target.value)}
+                                onChange={(event) => update("quantity", event.target.value)}
                             />
                         </div>
 
@@ -264,19 +305,21 @@ export function TradeFormDialog({ open, onOpenChange, trade }: TradeFormDialogPr
                         </div>
 
                         <div className="grid gap-2">
-                            <Label htmlFor="commission">Commission</Label>
+                            <Label htmlFor="commissionPerUnit">Commission per unit</Label>
                             <Input
-                                id="commission"
+                                id="commissionPerUnit"
                                 type="number"
                                 min="0"
                                 step="0.01"
                                 placeholder="0.00"
-                                value={form.commission}
-                                onChange={(event) => updateCommission(event.target.value)}
+                                value={form.commissionPerUnit}
+                                onChange={(event) =>
+                                    update("commissionPerUnit", event.target.value)
+                                }
                             />
                             <p className="text-xs text-muted-foreground">
-                                Total for the trade. Defaults to{" "}
-                                {DEFAULT_COMMISSION_PER_UNIT} × quantity.
+                                Total {formatCurrency(totalCommission, selectedMarket?.currency)} —
+                                calculated by the server as per unit × quantity.
                             </p>
                         </div>
 
@@ -315,7 +358,7 @@ export function TradeFormDialog({ open, onOpenChange, trade }: TradeFormDialogPr
                         >
                             Cancel
                         </Button>
-                        <Button type="submit" disabled={isSaving}>
+                        <Button type="submit" disabled={isSaving || noMarkets}>
                             {isSaving && <Loader2 className="animate-spin" />}
                             {isEditing ? "Save changes" : "Add trade"}
                         </Button>

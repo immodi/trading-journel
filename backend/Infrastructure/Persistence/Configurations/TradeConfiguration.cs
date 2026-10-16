@@ -25,6 +25,9 @@ public class TradeConfiguration : IEntityTypeConfiguration<Trade>
         builder.Property(t => t.ExitPrice)
             .HasPrecision(18, 4);
 
+        builder.Property(t => t.CommissionPerUnit)
+            .HasPrecision(18, 4);
+
         builder.Property(t => t.Commission)
             .HasPrecision(18, 4);
 
@@ -50,5 +53,13 @@ public class TradeConfiguration : IEntityTypeConfiguration<Trade>
             .WithMany(u => u.Trades)
             .HasForeignKey(t => t.UserId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // A trade must always belong to a market. Deleting a market that still
+        // has trades is refused (surfaced as 409 by the service) rather than
+        // silently discarding trade history.
+        builder.HasOne(t => t.Market)
+            .WithMany(m => m.Trades)
+            .HasForeignKey(t => t.MarketId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

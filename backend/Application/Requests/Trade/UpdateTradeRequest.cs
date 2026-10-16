@@ -15,5 +15,8 @@ public class UpdateTradeRequest
     public DateTime? EntryTime { get; init; }
     public DateTime? ExitTime { get; init; }
 
-    public decimal? Commission { get; init; }
+    public int? MarketId { get; init; }
+
+    /// <summary>Flat commission charged per unit; the server derives the total.</summary>
+    public decimal? CommissionPerUnit { get; init; }
 }

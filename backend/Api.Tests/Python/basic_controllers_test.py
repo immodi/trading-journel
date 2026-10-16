@@ -10,6 +10,7 @@ if len(sys.argv) != 2:
 port = sys.argv[1]
 
 TRADE_URL = f"http://localhost:{port}/api/trade"
+MARKET_URL = f"http://localhost:{port}/api/market"
 USER_URL = f"http://localhost:{port}/api/user"
 AUTH_URL = f"http://localhost:{port}/api/auth"
 
@@ -118,13 +119,30 @@ def test_users(token):
 
 
 # -----------------------------
+# MARKETS (PROTECTED)
+# -----------------------------
+def test_markets(token):
+    print("\nCREATE MARKET")
+    request(MARKET_URL, "POST", token=token, payload={
+        "name": "US Equities",
+        "currency": "USD"
+    })
+
+    print("\nGET MARKETS")
+    request(MARKET_URL, "GET", token=token)
+
+    print("\nUPDATE MARKET")
+    request(MARKET_URL, "PUT", "/1", token=token, payload={
+        "currency": "EUR"
+    })
+
+
+# -----------------------------
 # TRADES (PROTECTED)
 # -----------------------------
 def test_trades(token):
     print("\nCREATE TRADE")
-
     request(TRADE_URL, "POST", token=token, payload={
-        "userId": 1,
         "instrument": "MNQ SEP26",
         "direction": 0,
         "entryPrice": 23456.25,
@@ -132,6 +150,8 @@ def test_trades(token):
         "quantity": 2,
         "entryTime": "2026-07-05T10:00:00Z",
         "exitTime": "2026-07-05T10:15:00Z",
+        "marketId": 1,
+        "commissionPerUnit": 1.82
     })
 
     print("\nGET TRADES")
@@ -140,14 +160,25 @@ def test_trades(token):
     print("\nGET TRADE BY ID")
     request(TRADE_URL, "GET", "/1", token=token)
 
-    print("\nUPDATE TRADE")
+    print("\nUPDATE TRADE COMMISSION PER UNIT")
     request(TRADE_URL, "PUT", "/1", token=token, payload={
         "exitPrice": 23500.00,
-        "commission": 5.0
+        "commissionPerUnit": 2.50
     })
+
+    print("\nDELETE A MARKET WITH TRADES (EXPECT 409)")
+    try:
+        request(MARKET_URL, "DELETE", "/1", token=token)
+    except HTTPError as e:
+        print(f"Status: {e.code}")
+        print(e.read().decode())
+        print("-" * 60)
 
     print("\nDELETE TRADE")
     request(TRADE_URL, "DELETE", "/1", token=token)
+
+    print("\nDELETE MARKET")
+    request(MARKET_URL, "DELETE", "/1", token=token)
 
 
 # -----------------------------
@@ -158,6 +189,7 @@ def main():
 
     test_auth()
     test_users(token)
+    test_markets(token)
     test_trades(token)
 
 

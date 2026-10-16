@@ -67,9 +67,11 @@ export.
 ## Implemented
 
 * User accounts (register / log in / log out / view profile)
+* Market management (create, view, edit, and delete markets)
 * Manual trade entry and full trade CRUD
-* Per-user trade journal with per-trade commission
-* Server-computed profit/loss
+* Per-user trade journal where every trade belongs to a market and inherits its
+  currency
+* Server-computed profit/loss and commission
 * Performance dashboard with statistics and an equity curve
 * Search, filtering, and sorting of trades
 * Light / dark / system theme
@@ -117,7 +119,29 @@ Rules:
 
 ---
 
-## 5.2 Trade Journal (Implemented)
+## 5.2 Markets & Trade Journal (Implemented)
+
+### Markets
+
+A **market** groups a user's trades and defines the currency they are recorded
+in. The system shall allow users to:
+
+* Create a market with a name and a currency.
+* View all of their markets and the number of trades in each.
+* Edit a market's name or currency.
+* Delete a market, but only when it has no associated trades.
+
+Rules:
+
+* A market belongs to exactly one user; users only ever see their own markets.
+* A market name shall be unique per user.
+* A currency shall be a 3-letter ISO 4217 code (for example `USD`).
+* Every trade belongs to exactly one market and inherits the market's currency.
+* Deleting a market that still has trades shall be refused (`409 Conflict`) with
+  a message explaining that the trades must be deleted or reassigned first; the
+  trade history shall never be silently discarded.
+
+### Trade Journal
 
 The Trade Journal is the core feature of the application.
 
@@ -133,6 +157,7 @@ Each trade shall support the following information:
 
 | Field | Entered or derived | Notes |
 |---|---|---|
+| Market | Entered | Every trade belongs to a market (required) |
 | Instrument | Entered | Free text, max 20 characters |
 | Direction | Entered | Long or Short (the enum also reserves Sideways) |
 | Quantity | Entered | Whole number of units |
@@ -140,19 +165,23 @@ Each trade shall support the following information:
 | Exit price | Entered | Decimal |
 | Entry date and time | Entered | Stored in UTC |
 | Exit date and time | Entered | Stored in UTC |
-| Commission | Entered (optional) | Defaults to a per-unit rate × quantity |
+| Commission per unit | Entered | Flat rate charged per unit |
+| Currency | **Derived** | Inherited from the trade's market |
+| Commission | **Derived** | `CommissionPerUnit × Quantity`, computed by the server |
 | Profit / Loss | **Derived** | Computed by the server (see below) |
 | Trade duration | **Derived** | Exit time − entry time |
 
 Rules:
 
-* A trade always belongs to exactly one user.
+* A trade always belongs to exactly one user and exactly one market.
+* A trade inherits its currency from its market.
 * Profit/loss shall be computed by the server as
   `(exit − entry) × quantity − commission` for a Long trade, inverted for a
   Short trade. The client never supplies profit/loss.
-* When no commission is supplied, the server applies a default per-unit rate
-  (currently `1.82 × quantity`).
-* Editing a trade shall recompute its profit/loss from the stored values.
+* The client supplies a **per-unit commission**; the server derives the total
+  commission as `CommissionPerUnit × Quantity`. There is no hard-coded default.
+* Editing a trade shall re-derive its commission and profit/loss from the stored
+  values.
 
 > **Planned:** CSV import (created and imported trades behave identically once
 > stored).
@@ -178,6 +207,17 @@ shall display:
 
 Metrics shall be derived from the user's full trade history and update
 automatically whenever trades are created, edited, or deleted.
+
+Because each market carries a single currency and every trade inherits its
+market's currency, all monetary metrics are computed per market — net P/L,
+average win/loss, best/worst trade, total commission, and the equity curve are
+never summed across currencies. A compact market selector switches the
+dashboard between an **All markets** view, which shows only currency-independent
+metrics (total trades, overall win rate, and market/currency counts), and a
+single market's performance panel, which shows its monetary metrics, commission,
+and equity curve in that market's own currency. The recent-trades table and the
+selection are independent, and it formats each trade in its own market currency.
+The application never converts or combines amounts across currencies.
 
 > **Planned:** daily profit/loss, best/worst trading day, trade frequency, and
 > server-side statistics for large histories.
@@ -266,11 +306,12 @@ Tags shall be searchable and filterable.
 ## Manual Trade Entry (Implemented)
 
 1. Log in.
-2. Open the **Trades** page.
-3. Choose **Add trade**.
-4. Enter the instrument, direction, quantity, entry/exit prices, and entry/exit
-   times.
-5. Optionally override the pre-filled commission.
+2. Open the **Markets** page and create a market (name + currency) if one does
+   not already exist.
+3. Open the **Trades** page and choose **Add trade**.
+4. Select the market and enter the instrument, direction, quantity, entry/exit
+   prices, and entry/exit times.
+5. Enter the per-unit commission; the server derives the total.
 6. Save the trade.
 7. Review the updated dashboard statistics.
 
@@ -279,10 +320,13 @@ Tags shall be searchable and filterable.
 ## Reviewing Performance (Implemented)
 
 1. Log in.
-2. Open the dashboard to see net profit/loss, win rate, profit factor, average
-   win/loss, and the equity curve.
-3. Open the **Trades** page to search, filter, and sort the underlying trades.
-4. Edit or delete a trade and watch the metrics update.
+2. Open the dashboard. It opens on **All markets**, showing currency-independent
+   metrics (total trades, overall win rate, and market/currency counts).
+3. Use the market selector to pick a market and see its net profit/loss, win
+   rate, profit factor, average win/loss, total commission, and equity curve in
+   that market's own currency.
+4. Open the **Trades** page to search, filter, and sort the underlying trades.
+5. Edit or delete a trade and watch the metrics update.
 
 ---
 
@@ -321,6 +365,7 @@ The application shall:
 | Area | Status |
 |---|---|
 | User authentication | Implemented |
+| Market management (CRUD) | Implemented |
 | Manual trade entry | Implemented |
 | Trade journal (CRUD) | Implemented |
 | Server-side profit/loss & commission | Implemented |

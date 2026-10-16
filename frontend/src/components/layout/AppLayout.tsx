@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { LineChart, LayoutDashboard, ListOrdered, LogOut } from "lucide-react";
+import { LineChart, LayoutDashboard, ListOrdered, Landmark, LogOut } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import {
 
 const NAV_ITEMS = [
     { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
+    { to: "/markets", label: "Markets", icon: Landmark, end: false },
     { to: "/trades", label: "Trades", icon: ListOrdered, end: false },
 ];
 

@@ -14,9 +14,32 @@ export const DIRECTION_LABELS: Record<number, string> = {
     [Direction.Short]: "Short",
 };
 
+export interface Market {
+    id: number;
+    userId: number;
+    name: string;
+    /** ISO 4217 currency code applied to every trade in the market. */
+    currency: string;
+    /** Number of trades currently associated with the market. */
+    tradeCount: number;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateMarketInput {
+    name: string;
+    currency: string;
+}
+
+export type UpdateMarketInput = Partial<CreateMarketInput>;
+
 export interface Trade {
     id: number;
     userId: number;
+    marketId: number;
+    marketName: string;
+    /** Currency inherited from the trade's market. */
+    currency: string;
     instrument: string;
     direction: Direction;
     entryPrice: number;
@@ -24,6 +47,9 @@ export interface Trade {
     quantity: number;
     entryTime: string;
     exitTime: string;
+    /** Flat commission charged per unit. */
+    commissionPerUnit: number;
+    /** Total commission, derived by the server as `commissionPerUnit × quantity`. */
     commission: number;
     profitLoss: number;
     createdAt: string;
@@ -46,11 +72,10 @@ export interface CreateTradeInput {
     quantity: number;
     entryTime: string;
     exitTime: string;
-    /**
-     * Total commission for the trade. Omit to let the server apply its default
-     * (per-unit commission × quantity).
-     */
-    commission?: number;
+    /** The market the trade belongs to; its currency is inherited by the trade. */
+    marketId: number;
+    /** Flat commission charged per unit; the server derives the total. */
+    commissionPerUnit: number;
 }
 
 export type UpdateTradeInput = Partial<CreateTradeInput>;

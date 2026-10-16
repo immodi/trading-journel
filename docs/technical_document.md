@@ -141,11 +141,11 @@ Api             controllers, exception handling, (depends on Infrastructure)
 
 ```text
 src/
-├── api/         axios clients (client, auth, trades)
-├── hooks/       context + server state (useAuth, useTheme, useTrades)
+├── api/         axios clients (client, auth, markets, trades)
+├── hooks/       context + server state (useAuth, useTheme, useMarkets, useTrades)
 ├── lib/         pure helpers (analytics, format, datetime)
-├── components/  layout, dashboard, trades, theme, ui primitives
-├── pages/       route screens (Auth, Dashboard, Trades, NotFound)
+├── components/  layout, dashboard, markets, trades, theme, ui primitives
+├── pages/       route screens (Auth, Dashboard, Markets, Trades, NotFound)
 ├── router/      route table
 ├── types/       request/response & model types
 └── utils/       config, token storage
@@ -192,6 +192,11 @@ names are singular (`/api/trade`, not `/api/trades`).
 | `POST` | `/api/auth/register` | No | Create an account; returns a JWT. `409` if the email or username is taken. |
 | `POST` | `/api/auth/login` | No | Exchange email + password for a JWT. |
 | `GET` | `/api/auth/me` | Yes | The signed-in user's profile. |
+| `GET` | `/api/market` | Yes | List the caller's markets. |
+| `GET` | `/api/market/{id}` | Yes | Get one of the caller's markets. |
+| `POST` | `/api/market` | Yes | Create a market. `409` if the name is taken. |
+| `PUT` | `/api/market/{id}` | Yes | Update a market. |
+| `DELETE` | `/api/market/{id}` | Yes | Delete a market. `409` if it still has trades. |
 | `GET` | `/api/trade` | Yes | List the caller's trades. |
 | `GET` | `/api/trade/{id}` | Yes | Get one of the caller's trades. |
 | `POST` | `/api/trade` | Yes | Create a trade. |
@@ -205,7 +210,7 @@ names are singular (`/api/trade`, not `/api/trades`).
 
 ## Conventions
 
-* All trade endpoints operate **only** on the caller's own data.
+* All trade and market endpoints operate **only** on the caller's own data.
 * Errors use a consistent JSON body: `{ "code": <int>, "message": "<text>" }`.
 * Unknown `/api/*` routes return that same JSON `404` rather than the SPA shell.
 * Non-API routes fall back to the SPA `index.html` so deep links work.
@@ -263,21 +268,33 @@ User
   PasswordHash  string(255)
   CreatedAt     datetime (UTC)
   Trades        Trade[]      1 → many (cascade delete)
+  Markets       Market[]     1 → many (cascade delete)
 
-Trade
+Market
   Id            int          PK
   UserId        int          FK → User.Id
-  Instrument    string(20)
-  Direction     Direction    enum, stored as int
-  Quantity      int
-  EntryPrice    decimal(18,4)
-  ExitPrice     decimal(18,4)
-  EntryTime     datetime (UTC)
-  ExitTime      datetime (UTC)
-  Commission    decimal(18,4)
-  ProfitLoss    decimal(18,4)
+  Name          string(100)  unique per user
+  Currency      string(3)    ISO 4217
   CreatedAt     datetime (UTC)
   UpdatedAt     datetime (UTC)
+  Trades        Trade[]      1 → many (delete restricted)
+
+Trade
+  Id                int          PK
+  UserId            int          FK → User.Id
+  MarketId          int          FK → Market.Id
+  Instrument        string(20)
+  Direction         Direction    enum, stored as int
+  Quantity          int
+  EntryPrice        decimal(18,4)
+  ExitPrice         decimal(18,4)
+  EntryTime         datetime (UTC)
+  ExitTime          datetime (UTC)
+  CommissionPerUnit decimal(18,4)
+  Commission        decimal(18,4)
+  ProfitLoss        decimal(18,4)
+  CreatedAt         datetime (UTC)
+  UpdatedAt         datetime (UTC)
 
 Direction       enum
   Long = 0, Short = 1, Sideways = 2
@@ -289,16 +306,23 @@ See the rendered [entity diagram](./entity_diagram.png) and its
 ## Persistence
 
 * **EF Core** maps the entities through `IEntityTypeConfiguration` classes
-  (`UserConfiguration`, `TradeConfiguration`).
+  (`UserConfiguration`, `MarketConfiguration`, `TradeConfiguration`).
 * **SQLite** is the database (`ConnectionStrings:Default` = `Data Source=db.db`).
   The file is created on first run; the EF provider is swappable for SQL Server
   or PostgreSQL.
-* **Unique indexes** enforce unique `Username` and `Email`.
+* **Unique indexes** enforce unique `Username` and `Email`, plus a unique
+  `(UserId, Name)` index on `Markets`.
 * **Precision** on monetary columns is `(18,4)`; `Quantity` is an `int`.
 * **Timestamps** are stored as UTC via a global `UtcDateTimeConverter` (and a
   nullable variant), so comparisons are timezone-safe.
 * **Migrations** are applied automatically at startup (`Database.Migrate()`).
-  The current schema is a single `InitialCreate` migration.
+  `AddMarketsAndCommissionPerUnit` adds the `Markets` table and the
+  `MarketId`/`CommissionPerUnit` columns, attaching any pre-existing trades to a
+  per-user "Imported" market so no history is lost.
+* **Delete behaviour** — deleting a user cascades to their markets and trades;
+  deleting a market that still has trades is refused (`409 Conflict`) rather
+  than silently discarding trade history (enforced in the service and by a
+  `Restrict` foreign key).
 
 ## Profit/loss and commission
 
@@ -313,10 +337,14 @@ pnl = direction == Long
 ProfitLoss = pnl - Commission
 ```
 
-Commission defaults to a flat **per-unit** rate (`1.82 × Quantity`) when a trade
-is created without one; a client may supply an explicit value on create or edit.
-The default lives in `TradeMapper` and is mirrored in the frontend purely to
-pre-fill the form.
+The client supplies a **per-unit** commission (`CommissionPerUnit`) on create or
+edit; the server is the source of truth and always derives the stored total:
+
+```text
+Commission = CommissionPerUnit × Quantity
+```
+
+There is no hard-coded default rate. The frontend only previews the total.
 
 ---
 
@@ -331,8 +359,10 @@ Validation is intentionally lightweight:
 * **Update** requests are partial — every field is nullable and only the supplied
   fields are applied.
 * **Business rules** are enforced in the service layer, e.g. duplicate
-  username/email on registration (→ `409`) and access to a trade the user does
-  not own (→ `404`).
+  username/email on registration and duplicate market names (→ `409`), access to
+  a trade or market the user does not own (→ `404`), a market name/currency that
+  fails validation or a negative commission per unit (→ `400`), and deleting a
+  market that still has trades (→ `409`).
 
 > **[Planned]** FluentValidation for richer, declarative request rules.
 
@@ -345,10 +375,11 @@ unhandled exceptions into status codes and a uniform `ErrorResponse`:
 | --- | --- |
 | `KeyNotFoundException` | `404 Not Found` |
 | `UnauthorizedAccessException` | `401 Unauthorized` |
+| `ConflictException` | `409 Conflict` |
 | `ArgumentException` | `400 Bad Request` |
 | anything else | `500 Internal Server Error` |
 
-`404`/`400` messages are passed through; `500`s are logged with the request
+`404`/`400`/`409` messages are passed through; `500`s are logged with the request
 method and path and returned as a generic message so internals never leak.
 
 Standard API responses used by the app: `200 OK`, `401 Unauthorized`,
@@ -411,6 +442,21 @@ list: total trades, net P/L, win rate, gross profit/loss, total commission,
 average win/loss, profit factor, best/worst trade, and an equity curve
 (cumulative P/L). The dashboard renders them as summary cards plus a
 dependency-free SVG equity curve.
+
+Monetary metrics are computed per market (`calculateStatsForMarket`): because
+every trade in a market inherits that market's currency, trades only ever share
+a monetary total or equity curve with trades in the same currency, so amounts in
+different currencies (for example EGP and USD) are never added together. The
+dashboard exposes a compact market selector (built from `getMarketSummaries`,
+which derives the market list from the loaded trades — no extra API call) that
+switches between an **All markets** view and a single market's panel. The All
+markets view shows only currency-independent metrics from
+`calculateOverallStats` (total trades, win rate, market/currency counts); a
+selected market shows its net P/L, averages, commission, and equity curve in its
+own currency. The selector updates the cards and curve without a page reload and
+scales to any number of markets. The application performs no currency
+conversion. `vitest` unit tests in `lib/analytics.test.ts` assert that
+cross-currency trades never contribute to the same monetary total or curve.
 
 ## Theming
 
@@ -486,12 +532,14 @@ the app self-extracts on launch.
 
 ## Backend tests
 
-`Infrastructure.Tests` holds **31 xUnit tests** covering:
+`Infrastructure.Tests` holds **60 xUnit tests** covering:
 
 * `TradeService` — CRUD, per-user scoping, P/L and commission rules
-* `TradeRepository` — persistence and lookups
+* `MarketService` — CRUD, per-user scoping, duplicate names, safe deletion
+* `TradeRepository` — persistence, lookups, and market associations
+* `MarketRepository` — persistence and per-user queries
 * `UserService` — user retrieval
-* `UserRepository` — persistence and lookups
+* `UserRepository` — persistence, lookups, and cascade deletion
 * `PasswordHasher` — hash/verify round-trips
 
 They use SQLite in-memory for the repository tests, Moq for the service tests,
@@ -499,7 +547,9 @@ and FluentAssertions throughout.
 
 ## Frontend checks
 
-`pnpm lint` (ESLint) and `pnpm build` (`tsc -b` type-check + Vite build).
+`pnpm test` (Vitest unit tests), `pnpm lint` (ESLint), and `pnpm build`
+(`tsc -b` type-check + Vite build). Unit tests live beside the logic as
+`*.test.ts`; `src/lib/analytics.test.ts` covers the per-currency aggregation.
 
 ## Continuous integration
 
@@ -507,7 +557,7 @@ and FluentAssertions throughout.
 request:
 
 1. **Backend** — restore, build the solution, and run the tests.
-2. **Frontend** — install with pnpm, lint, and build.
+2. **Frontend** — install with pnpm, run the unit tests, lint, and build.
 3. **Publish** — a self-contained single-file publish smoke test to catch
    packaging regressions.
 

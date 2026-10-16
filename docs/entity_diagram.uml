@@ -14,10 +14,22 @@ entity "User" as User {
   CreatedAt : datetime
 }
 
+entity "Market" as Market {
+  * Id : int
+  --
+  UserId : int (FK)
+  --
+  Name : string(100)
+  Currency : string(3)
+  CreatedAt : datetime
+  UpdatedAt : datetime
+}
+
 entity "Trade" as Trade {
   * Id : int
   --
   UserId : int (FK)
+  MarketId : int (FK)
   --
   Instrument : string(20)
   Direction : Direction
@@ -26,6 +38,7 @@ entity "Trade" as Trade {
   ExitPrice : decimal(18,4)
   EntryTime : datetime
   ExitTime : datetime
+  CommissionPerUnit : decimal(18,4)
   Commission : decimal(18,4)
   ProfitLoss : decimal(18,4)
   CreatedAt : datetime
@@ -38,20 +51,28 @@ enum "Direction" as Direction {
   Sideways = 2
 }
 
+User "1" ||--o{ "0..*" Market : owns
 User "1" ||--o{ "0..*" Trade : owns
+Market "1" ||--o{ "0..*" Trade : groups
 Trade ..> Direction : stored as int
 
 legend right
   == Storage ==
   SQLite via EF Core 10
-  Single migration: InitialCreate
+  Migrations: InitialCreate, AddMarketsAndCommissionPerUnit
 
   == Rules ==
   Username and Email are unique.
-  Commission defaults to 1.82 x Quantity when not supplied.
+  Market names are unique per user.
+  Currency is a 3-letter ISO 4217 code.
+  A trade always belongs to a market and
+  inherits its currency.
+  CommissionPerUnit is user supplied.
+  Commission = CommissionPerUnit x Quantity
   ProfitLoss = (Exit - Entry) x Quantity - Commission
   (Entry - Exit for Short).
-  Deleting a user cascades to their trades.
+  Deleting a user cascades to their markets and trades.
+  Deleting a market with trades is refused (409).
 
   == Not yet modelled ==
   TradeNote, Screenshot, Tag, TradeTag and

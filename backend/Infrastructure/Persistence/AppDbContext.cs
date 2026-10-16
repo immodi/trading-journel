@@ -8,6 +8,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 {
     public DbSet<Trade> Trades => Set<Trade>();
     public DbSet<User> Users => Set<User>();
+    public DbSet<Market> Markets => Set<Market>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

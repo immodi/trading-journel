@@ -12,4 +12,6 @@ public class User
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     
     public ICollection<Trade> Trades { get; set; } = [];
+
+    public ICollection<Market> Markets { get; set; } = [];
 }

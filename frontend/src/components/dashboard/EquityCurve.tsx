@@ -5,6 +5,8 @@ import { formatCurrency } from "@/lib/format";
 
 interface EquityCurveProps {
     points: EquityPoint[];
+    /** ISO 4217 code used to format the curve's monetary labels. */
+    currency?: string;
 }
 
 const WIDTH = 100;
@@ -15,8 +17,11 @@ const PADDING = 8;
  * Dependency-free SVG equity curve. Coordinates are normalised to a 0-100
  * viewBox and stretched to the container; `vector-effect="non-scaling-stroke"`
  * keeps the line crisp regardless of the rendered size.
+ *
+ * The points are expected to belong to a single currency; the currency is only
+ * used to format the labels and never to convert values.
  */
-export function EquityCurve({ points }: EquityCurveProps) {
+export function EquityCurve({ points, currency = "USD" }: EquityCurveProps) {
     const gradientId = useId();
 
     if (points.length === 0) {
@@ -57,9 +62,9 @@ export function EquityCurve({ points }: EquityCurveProps) {
     return (
         <div className="w-full">
             <div className="flex items-baseline justify-between pb-2 text-xs text-muted-foreground">
-                <span>Start {formatCurrency(points[0].equity)}</span>
+                <span>Start {formatCurrency(points[0].equity, currency)}</span>
                 <span className={cn("font-medium", isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
-                    Now {formatCurrency(points[points.length - 1].equity)}
+                    Now {formatCurrency(points[points.length - 1].equity, currency)}
                 </span>
             </div>
 
@@ -68,7 +73,7 @@ export function EquityCurve({ points }: EquityCurveProps) {
                 preserveAspectRatio="none"
                 className="h-56 w-full"
                 role="img"
-                aria-label="Equity curve"
+                aria-label={`Equity curve (${currency})`}
             >
                 <defs>
                     <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">

@@ -21,6 +21,7 @@ comes from `frontend/.env.development` (`http://localhost:5067`) — leave
 | `pnpm dev` | Start the Vite dev server with HMR |
 | `pnpm build` | Type-check (`tsc -b`) and build for production |
 | `pnpm lint` | Run ESLint |
+| `pnpm test` | Run the Vitest unit tests once |
 | `pnpm preview` | Preview the production build locally |
 
 ## Structure
@@ -49,3 +50,8 @@ src/
   JWT and redirects to `/login` on a `401`.
 - Timestamps are sent to the API as UTC ISO strings and rendered in the
   browser's local timezone (`src/lib/datetime.ts`).
+- Monetary dashboard metrics are computed per market
+  (`calculateStatsForMarket`); values in different currencies are never summed.
+  The dashboard's market selector is derived from the loaded trades
+  (`getMarketSummaries`), so no extra markets request is needed.
+  Unit tests live next to the logic as `*.test.ts` and run with `pnpm test`.

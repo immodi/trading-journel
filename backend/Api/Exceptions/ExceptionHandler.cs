@@ -1,3 +1,4 @@
+using Application.Exceptions;
 using Application.Responses;
 using Microsoft.AspNetCore.Diagnostics;
 
@@ -14,6 +15,7 @@ public sealed class ExceptionHandler(ILogger<ExceptionHandler> logger) : IExcept
         {
             KeyNotFoundException => StatusCodes.Status404NotFound,
             UnauthorizedAccessException => StatusCodes.Status401Unauthorized,
+            ConflictException => StatusCodes.Status409Conflict,
             ArgumentException => StatusCodes.Status400BadRequest,
             _ => StatusCodes.Status500InternalServerError
         };
@@ -25,7 +27,7 @@ public sealed class ExceptionHandler(ILogger<ExceptionHandler> logger) : IExcept
 
         var response = new ErrorResponse(
             statusCode,
-            exception is KeyNotFoundException or ArgumentException
+            exception is KeyNotFoundException or ArgumentException or ConflictException
                 ? exception.Message
                 : "An unexpected error occurred."
         );

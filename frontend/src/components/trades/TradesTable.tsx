@@ -97,6 +97,7 @@ export function TradesTable({ trades, onEdit, onDelete }: TradesTableProps) {
                         direction={sortDirection}
                         onClick={() => toggleSort("instrument")}
                     />
+                    <TableHead>Market</TableHead>
                     <TableHead>Direction</TableHead>
                     <TableHead className="text-right">Qty</TableHead>
                     <TableHead className="text-right">Entry</TableHead>
@@ -123,6 +124,9 @@ export function TradesTable({ trades, onEdit, onDelete }: TradesTableProps) {
                 {sorted.map((trade) => (
                     <TableRow key={trade.id}>
                         <TableCell className="font-medium">{trade.instrument}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                            {trade.marketName}
+                        </TableCell>
                         <TableCell>
                             <DirectionBadge direction={trade.direction} />
                         </TableCell>
@@ -136,7 +140,7 @@ export function TradesTable({ trades, onEdit, onDelete }: TradesTableProps) {
                             {formatPrice(trade.exitPrice)}
                         </TableCell>
                         <TableCell className="text-right tabular-nums text-muted-foreground">
-                            {formatCurrency(trade.commission)}
+                            {formatCurrency(trade.commission, trade.currency)}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                             {formatDateTime(trade.exitTime)}
@@ -145,7 +149,10 @@ export function TradesTable({ trades, onEdit, onDelete }: TradesTableProps) {
                             {formatDuration(trade.entryTime, trade.exitTime)}
                         </TableCell>
                         <TableCell className="text-right">
-                            <ProfitLossValue value={trade.profitLoss} />
+                            <ProfitLossValue
+                                value={trade.profitLoss}
+                                currency={trade.currency}
+                            />
                         </TableCell>
                         <TableCell className="text-right">
                             <DropdownMenu>

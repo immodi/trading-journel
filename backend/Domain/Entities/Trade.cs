@@ -11,6 +11,11 @@ public class Trade
 
     public User? User { get; set; }
 
+    public int MarketId { get; set; }
+
+    /// <summary>The market this trade belongs to; supplies the trade currency.</summary>
+    public Market? Market { get; set; }
+
     public string Instrument { get; set; } = string.Empty;
     
     public Direction Direction { get; set; }
@@ -22,6 +27,10 @@ public class Trade
     public DateTime EntryTime { get; set; }
     public DateTime ExitTime { get; set; } 
     
+    /// <summary>Flat commission charged per unit (contract/share).</summary>
+    public decimal CommissionPerUnit { get; set; }
+
+    /// <summary>Total commission for the trade, derived as <c>CommissionPerUnit × Quantity</c>.</summary>
     public decimal Commission { get; set; }
     public decimal ProfitLoss { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

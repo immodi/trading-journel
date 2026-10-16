@@ -1,4 +1,5 @@
 using Domain.Entities;
+using Domain.Enum;
 using FluentAssertions;
 using Infrastructure.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -128,5 +129,54 @@ public class UserRepositoryTests
         var deleted = await context.Users.FindAsync(user.Id);
 
         deleted.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task DeleteAsync_Should_Cascade_To_Markets_And_Trades()
+    {
+        await using var context = DbContextFactory.Create();
+        var repository = new UserRepository(context);
+
+        var user = new User
+        {
+            Username = "cascade",
+            Email = "cascade@test.com",
+            PasswordHash = "hash"
+        };
+
+        context.Users.Add(user);
+        await context.SaveChangesAsync();
+
+        var market = new Market { UserId = user.Id, Name = "US Equities", Currency = "USD" };
+        context.Markets.Add(market);
+        await context.SaveChangesAsync();
+
+        context.Trades.Add(new Trade
+        {
+            UserId = user.Id,
+            MarketId = market.Id,
+            Instrument = "MNQ",
+            Direction = Direction.Long,
+            EntryPrice = 100,
+            ExitPrice = 110,
+            Quantity = 1,
+            EntryTime = DateTime.UtcNow,
+            ExitTime = DateTime.UtcNow,
+            CommissionPerUnit = 1,
+            Commission = 1,
+            ProfitLoss = 9
+        });
+        await context.SaveChangesAsync();
+
+        // The API loads and deletes the user in a fresh request scope, so no
+        // related entities are tracked; the database performs the cascade.
+        context.ChangeTracker.Clear();
+
+        await repository.DeleteAsync(user.Id);
+        await repository.SaveChangesAsync();
+
+        (await context.Users.FindAsync(user.Id)).Should().BeNull();
+        (await context.Markets.CountAsync()).Should().Be(0);
+        (await context.Trades.CountAsync()).Should().Be(0);
     }
 }

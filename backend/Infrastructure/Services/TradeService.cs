@@ -7,7 +7,9 @@ using Domain.Entities;
 
 namespace Infrastructure.Services;
 
-public class TradeService(ITradeRepository repository) : ITradeService
+public class TradeService(
+    ITradeRepository repository,
+    IMarketRepository marketRepository) : ITradeService
 {
     public async Task<IEnumerable<TradeDto>> GetAllAsync(int userId)
     {
@@ -23,7 +25,10 @@ public class TradeService(ITradeRepository repository) : ITradeService
 
     public async Task<TradeDto> AddAsync(int userId, CreateTradeRequest request)
     {
-        var trade = request.ToEntity(userId);
+        var market = await ResolveMarketAsync(userId, request.MarketId);
+        ValidateCommissionPerUnit(request.CommissionPerUnit);
+
+        var trade = request.ToEntity(userId, market);
 
         await repository.AddAsync(trade);
         await repository.SaveChangesAsync();
@@ -34,6 +39,15 @@ public class TradeService(ITradeRepository repository) : ITradeService
     public async Task UpdateAsync(int userId, int id, UpdateTradeRequest request)
     {
         var trade = await GetOwnedTradeAsync(userId, id);
+
+        if (request.MarketId.HasValue)
+        {
+            var market = await ResolveMarketAsync(userId, request.MarketId.Value);
+            trade.Market = market;
+        }
+
+        if (request.CommissionPerUnit.HasValue)
+            ValidateCommissionPerUnit(request.CommissionPerUnit.Value);
 
         request.UpdateTrade(trade);
 
@@ -56,11 +70,30 @@ public class TradeService(ITradeRepository repository) : ITradeService
     /// </summary>
     private async Task<Trade> GetOwnedTradeAsync(int userId, int id)
     {
-        var trade = await repository.GetByIdAsync(id);
+        var trade = await repository.GetWithMarketAsync(id);
 
         if (trade is null || trade.UserId != userId)
             throw new KeyNotFoundException($"Trade with id {id} was not found.");
 
         return trade;
+    }
+
+    /// <summary>
+    /// Resolves a market that must exist and belong to the requesting user.
+    /// </summary>
+    private async Task<Market> ResolveMarketAsync(int userId, int marketId)
+    {
+        var market = await marketRepository.GetByIdAsync(marketId);
+
+        if (market is null || market.UserId != userId)
+            throw new KeyNotFoundException($"Market with id {marketId} was not found.");
+
+        return market;
+    }
+
+    private static void ValidateCommissionPerUnit(decimal commissionPerUnit)
+    {
+        if (commissionPerUnit < 0)
+            throw new ArgumentException("Commission per unit must be a non-negative number.");
     }
 }

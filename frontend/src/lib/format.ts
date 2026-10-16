@@ -1,10 +1,3 @@
-const currencyFormatter = new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-});
-
 const priceFormatter = new Intl.NumberFormat("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 4,
@@ -12,12 +5,40 @@ const priceFormatter = new Intl.NumberFormat("en-US", {
 
 const integerFormatter = new Intl.NumberFormat("en-US");
 
-export function formatCurrency(value: number): string {
-    return currencyFormatter.format(value);
+const currencyFormatters = new Map<string, Intl.NumberFormat>();
+
+function currencyFormatter(currency: string): Intl.NumberFormat {
+    let formatter = currencyFormatters.get(currency);
+
+    if (!formatter) {
+        formatter = new Intl.NumberFormat("en-US", {
+            style: "currency",
+            currency,
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        });
+        currencyFormatters.set(currency, formatter);
+    }
+
+    return formatter;
 }
 
-export function formatSignedCurrency(value: number): string {
-    const formatted = currencyFormatter.format(Math.abs(value));
+/**
+ * Formats a monetary amount in the given ISO 4217 currency (defaults to USD).
+ */
+export function formatCurrency(value: number, currency = "USD"): string {
+    try {
+        return currencyFormatter(currency || "USD").format(value);
+    } catch {
+        return `${value.toFixed(2)} ${currency}`;
+    }
+}
+
+/**
+ * Like {@link formatCurrency} but always shows an explicit + or - sign.
+ */
+export function formatSignedCurrency(value: number, currency = "USD"): string {
+    const formatted = formatCurrency(Math.abs(value), currency);
     if (value > 0) return `+${formatted}`;
     if (value < 0) return `-${formatted}`;
     return formatted;

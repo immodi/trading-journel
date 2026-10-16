@@ -5,6 +5,7 @@ import {
     listTrades,
     updateTrade,
 } from "@/api/trades";
+import { marketKeys } from "@/hooks/useMarkets";
 import type { CreateTradeInput, UpdateTradeInput } from "@/types/models";
 
 export const tradeKeys = {
@@ -26,6 +27,8 @@ export function useCreateTrade() {
         mutationFn: (input: CreateTradeInput) => createTrade(input),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: tradeKeys.all });
+            // Trade counts shown on the markets page change with the journal.
+            queryClient.invalidateQueries({ queryKey: marketKeys.all });
         },
     });
 }
@@ -38,6 +41,7 @@ export function useUpdateTrade() {
             updateTrade(id, input),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: tradeKeys.all });
+            queryClient.invalidateQueries({ queryKey: marketKeys.all });
         },
     });
 }
@@ -49,6 +53,7 @@ export function useDeleteTrade() {
         mutationFn: (id: number) => deleteTrade(id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: tradeKeys.all });
+            queryClient.invalidateQueries({ queryKey: marketKeys.all });
         },
     });
 }

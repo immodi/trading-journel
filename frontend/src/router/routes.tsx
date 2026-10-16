@@ -1,6 +1,7 @@
 import { createBrowserRouter } from "react-router-dom";
 import AuthPage from "@/pages/AuthPage";
 import DashboardPage from "@/pages/DashboardPage";
+import MarketsPage from "@/pages/MarketsPage";
 import TradesPage from "@/pages/TradesPage";
 import NotFoundPage from "@/pages/NotFoundPage";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -18,6 +19,7 @@ export const router = createBrowserRouter([
                 element: <AppLayout />,
                 children: [
                     { index: true, element: <DashboardPage /> },
+                    { path: "markets", element: <MarketsPage /> },
                     { path: "trades", element: <TradesPage /> },
                 ],
             },

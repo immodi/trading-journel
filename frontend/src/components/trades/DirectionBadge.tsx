@@ -1,4 +1,5 @@
 import { Direction, DIRECTION_LABELS } from "@/types/models";
+import { formatCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 
@@ -20,7 +21,13 @@ export function DirectionBadge({ direction }: { direction: number }) {
     );
 }
 
-export function ProfitLossValue({ value }: { value: number }) {
+export function ProfitLossValue({
+    value,
+    currency = "USD",
+}: {
+    value: number;
+    currency?: string;
+}) {
     const tone =
         value > 0
             ? "text-emerald-600 dark:text-emerald-400"
@@ -28,5 +35,10 @@ export function ProfitLossValue({ value }: { value: number }) {
               ? "text-rose-600 dark:text-rose-400"
               : "text-muted-foreground";
 
-    return <span className={cn("font-medium tabular-nums", tone)}>{value >= 0 ? "+" : "-"}${Math.abs(value).toFixed(2)}</span>;
+    return (
+        <span className={cn("font-medium tabular-nums", tone)}>
+            {value >= 0 ? "+" : "-"}
+            {formatCurrency(Math.abs(value), currency)}
+        </span>
+    );
 }

@@ -26,13 +26,15 @@ EF Core persistence layer with migrations, and a test suite wired into CI.
 - **Authentication** — register / login with JWT access tokens. Passwords are
   hashed with ASP.NET Core Identity's PBKDF2 hasher; every API call is
   authenticated and scoped to the signed-in user.
+- **Markets** — create, edit, and delete markets. Each market carries a single
+  currency that every trade in it inherits.
 - **Trade journal** — create, edit, and delete trades with instrument,
-  direction (Long/Short), quantity, entry/exit prices, entry/exit times, and a
-  per-trade commission.
+  direction (Long/Short), quantity, entry/exit prices, entry/exit times, and an
+  association to a market.
 - **Server-side P/L** — profit/loss is calculated by the API from entry/exit
   prices, quantity, and commission, so every client shows identical numbers.
-  Commission defaults to a per-unit rate and can be overridden on create or
-  edit; input is validated on both ends.
+  You supply a per-unit commission on create or edit and the server derives the
+  total (`per unit × quantity`); input is validated on both ends.
 - **Dashboard** — net P/L, win rate, profit factor, average win, average loss,
   total trades, commission, plus a dependency-free SVG equity curve and a
   recent-trades table. All metrics are derived from your trade history.
@@ -93,9 +95,11 @@ state), `lib/` (pure helpers such as analytics and formatting), `components/`
 
 ### Current data model
 
-The implemented schema is `Users` and `Trades` (one user → many trades, cascade
-delete); the [entity diagram](./docs/entity_diagram.png) shows it in full.
-Planned entities — tags, notes, screenshots, and import history — are described
+The implemented schema is `Users`, `Markets`, and `Trades`: one user → many
+markets and many trades, and each trade belongs to exactly one market whose
+currency it inherits. A market that still has trades cannot be deleted (`409`).
+The [entity diagram](./docs/entity_diagram.png) shows it in full. Planned
+entities — tags, notes, screenshots, and import history — are described
 in the [requirements](./docs/business_requirements.md) and tracked on the
 roadmap.
 
@@ -162,6 +166,11 @@ operate on the caller's own data.
 | `POST` | `/api/auth/register` | Create an account, returns a JWT |
 | `POST` | `/api/auth/login` | Exchange credentials for a JWT |
 | `GET` | `/api/auth/me` | Current user's profile |
+| `GET` | `/api/market` | List the current user's markets |
+| `GET` | `/api/market/{id}` | Get a single market |
+| `POST` | `/api/market` | Create a market |
+| `PUT` | `/api/market/{id}` | Update a market |
+| `DELETE` | `/api/market/{id}` | Delete a market (`409` if it has trades) |
 | `GET` | `/api/trade` | List the current user's trades |
 | `GET` | `/api/trade/{id}` | Get a single trade |
 | `POST` | `/api/trade` | Create a trade |
@@ -175,12 +184,13 @@ exception handler.
 ## Testing
 
 ```bash
-# Backend: 31 xUnit tests (services, repositories, password hashing)
+# Backend: 60 xUnit tests (services, repositories, password hashing)
 cd backend
 dotnet test
 
-# Frontend: type-check, lint, and production build
+# Frontend: unit tests, type-check, lint, and production build
 cd frontend
+pnpm test
 pnpm lint
 pnpm build
 ```
@@ -199,9 +209,9 @@ backend/
   Infrastructure.Tests/  unit & integration tests
 frontend/
   src/api/          HTTP clients
-  src/hooks/        auth, theme & trade server state
+  src/hooks/        auth, theme, market & trade server state
   src/lib/          analytics, formatting, datetime helpers
-  src/components/   layout, dashboard, trades, ui primitives
+  src/components/   layout, dashboard, markets, trades, ui primitives
   src/pages/        route screens
 docs/               business requirements, technical doc, domain diagram
 ```
