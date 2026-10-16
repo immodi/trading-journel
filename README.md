@@ -15,9 +15,9 @@ The app is a complete vertical slice of a real product: a typed React SPA, a
 layered ASP.NET Core API, JWT authentication with per-user data isolation, an
 EF Core persistence layer with migrations, and a test suite wired into CI.
 
-> Status: the authentication and trade-journal core is implemented and covered
-> by tests. Analytics, CSV import, and trade annotations are on the
-> [roadmap](#roadmap).
+> Status: the authentication, trade-journal, and analytics core is implemented
+> and covered by tests. CSV import and trade annotations (notes, screenshots,
+> tags) are on the [roadmap](#roadmap).
 
 ---
 
@@ -94,9 +94,10 @@ state), `lib/` (pure helpers such as analytics and formatting), `components/`
 ### Current data model
 
 The implemented schema is `Users` and `Trades` (one user → many trades, cascade
-delete). The [full domain model](./docs/entity_diagram.png) — including tags,
-notes, screenshots, and CSV import history — is captured in the design docs and
-tracked on the roadmap.
+delete); the [entity diagram](./docs/entity_diagram.png) shows it in full.
+Planned entities — tags, notes, screenshots, and import history — are described
+in the [requirements](./docs/business_requirements.md) and tracked on the
+roadmap.
 
 ## Getting started
 
@@ -174,7 +175,7 @@ exception handler.
 ## Testing
 
 ```bash
-# Backend: 29 xUnit tests (services, repositories, password hashing)
+# Backend: 31 xUnit tests (services, repositories, password hashing)
 cd backend
 dotnet test
 

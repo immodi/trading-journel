@@ -1,89 +1,61 @@
 @startuml
 hide circle
 skinparam linetype ortho
+skinparam shadowing false
+
+title Trading Journal — Entity Diagram (implemented)
 
 entity "User" as User {
-  * Id : uniqueidentifier
+  * Id : int
   --
-  Username : nvarchar
-  Email : nvarchar
-  PasswordHash : nvarchar
+  Username : string
+  Email : string
+  PasswordHash : string
   CreatedAt : datetime
 }
 
 entity "Trade" as Trade {
-  * Id : uniqueidentifier
+  * Id : int
   --
-  UserId : FK
-
-  Instrument : nvarchar
-  Direction : enum
-  EntryPrice : decimal
-  ExitPrice : decimal
-  Quantity : decimal
-
+  UserId : int (FK)
+  --
+  Instrument : string(20)
+  Direction : Direction
+  Quantity : int
+  EntryPrice : decimal(18,4)
+  ExitPrice : decimal(18,4)
   EntryTime : datetime
   ExitTime : datetime
-
-  Commission : decimal
-  ProfitLoss : decimal
-
+  Commission : decimal(18,4)
+  ProfitLoss : decimal(18,4)
   CreatedAt : datetime
   UpdatedAt : datetime
 }
 
-entity "TradeNote" as Note {
-  * Id : uniqueidentifier
-  --
-  TradeId : FK
-
-  Content : nvarchar(max)
-  CreatedAt : datetime
+enum "Direction" as Direction {
+  Long = 0
+  Short = 1
+  Sideways = 2
 }
 
-entity "Screenshot" as Screenshot {
-  * Id : uniqueidentifier
-  --
-  TradeId : FK
+User "1" ||--o{ "0..*" Trade : owns
+Trade ..> Direction : stored as int
 
-  FileName : nvarchar
-  FilePath : nvarchar
-  UploadedAt : datetime
-}
+legend right
+  == Storage ==
+  SQLite via EF Core 10
+  Single migration: InitialCreate
 
-entity "Tag" as Tag {
-  * Id : uniqueidentifier
-  --
-  UserId : FK
+  == Rules ==
+  Username and Email are unique.
+  Commission defaults to 1.82 x Quantity when not supplied.
+  ProfitLoss = (Exit - Entry) x Quantity - Commission
+  (Entry - Exit for Short).
+  Deleting a user cascades to their trades.
 
-  Name : nvarchar
-  Color : nvarchar
-}
-
-entity "TradeTag" as TradeTag {
-  * TradeId : FK
-  * TagId : FK
-}
-
-entity "ImportHistory" as ImportHistory {
-  * Id : uniqueidentifier
-  --
-  UserId : FK
-
-  FileName : nvarchar
-  ImportedTrades : int
-  FailedTrades : int
-  ImportedAt : datetime
-}
-
-User ||--o{ Trade
-User ||--o{ Tag
-User ||--o{ ImportHistory
-
-Trade ||--o{ Note
-Trade ||--o{ Screenshot
-
-Trade ||--o{ TradeTag
-Tag ||--o{ TradeTag
+  == Not yet modelled ==
+  TradeNote, Screenshot, Tag, TradeTag and
+  ImportHistory are planned (see the roadmap).
+endlegend
 
 @enduml

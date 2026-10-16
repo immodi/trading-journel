@@ -2,8 +2,14 @@
 
 ## Product Requirements Document (PRD)
 
-**Version:** 1.0
-**Status:** Draft
+**Version:** 2.0
+**Status:** Living document — reflects the shipped release
+
+> **How to read this document.** Every requirement is tagged **[Implemented]**,
+> **[Planned]**, or **[Out of scope]**. The shipped data model and API are
+> described in the [technical design document](./technical_document.md) and the
+> [entity diagram](./entity_diagram.png); features that are designed but not yet
+> built are also tracked in the [roadmap](../README.md#roadmap).
 
 ---
 
@@ -13,9 +19,14 @@
 
 Trading Journal is a web application that enables traders to document, organize, and analyze their trading activity.
 
-The application replaces spreadsheets and scattered notes with a centralized journal where users can manually record trades or import them from supported trading platforms. It provides performance analytics, trade organization, and historical insights to help traders improve their decision-making over time.
+The application replaces spreadsheets and scattered notes with a centralized journal where users record their completed trades and review performance analytics. It provides performance statistics, trade organization, and historical insight to help traders improve their decision-making over time.
 
 Trading Journal **does not execute trades or connect to live financial markets**. Its purpose is to support post-trade review and continuous improvement.
+
+> **Current release.** Trades are entered manually and summarized on a
+> performance dashboard. CSV import, trade notes, screenshots, and tags are
+> designed but not yet implemented (see [§5.5–§5.8](#55-csv-import-planned) and
+> [§9](#9-future-enhancements)).
 
 ---
 
@@ -23,14 +34,15 @@ Trading Journal **does not execute trades or connect to live financial markets**
 
 The application aims to help traders:
 
-* Maintain an organized history of all completed trades.
-* Record trades manually or import them from CSV files.
-* Reduce repetitive data entry through automated imports.
-* Attach notes and screenshots to trades.
-* Organize trades using custom tags.
-* Measure trading performance through meaningful statistics.
-* Review historical trades through search and filtering.
-* Identify strengths, weaknesses, and recurring trading patterns.
+* **[Implemented]** Maintain an organized history of all completed trades.
+* **[Implemented]** Record trades manually.
+* **[Implemented]** Measure trading performance through meaningful statistics.
+* **[Implemented]** Review historical trades through search and filtering.
+* **[Implemented]** Identify strengths, weaknesses, and recurring patterns — via
+  win rate, profit factor, average win/loss, and the equity curve.
+* **[Planned]** Import trades from CSV files to reduce repetitive data entry.
+* **[Planned]** Attach notes and screenshots to trades.
+* **[Planned]** Organize trades using custom tags.
 
 ---
 
@@ -44,26 +56,33 @@ The application is designed for individual retail traders who trade:
 * Options
 * Cryptocurrency
 
-Users may trade through any broker or prop firm that provides trade history exports.
+Users may trade through any broker or prop firm. Manual entry is always
+available; CSV import (planned) will require brokers to provide a trade-history
+export.
 
 ---
 
 # 4. Project Scope
 
-## In Scope
+## Implemented
 
-* User authentication
-* Manual trade entry
+* User accounts (register / log in / log out / view profile)
+* Manual trade entry and full trade CRUD
+* Per-user trade journal with per-trade commission
+* Server-computed profit/loss
+* Performance dashboard with statistics and an equity curve
+* Search, filtering, and sorting of trades
+* Light / dark / system theme
+* Single-artifact, self-hosted deployment
+
+## Planned
+
 * CSV trade imports
-* Trade journal
-* Performance dashboard
-* Statistics and analytics
 * Trade notes
 * Screenshot uploads
 * Trade tagging
-* Search and filtering
 
-## Out of Scope
+## Out of scope
 
 * Trade execution
 * Live market data
@@ -76,50 +95,110 @@ Users may trade through any broker or prop firm that provides trade history expo
 
 # 5. Functional Requirements
 
-## 5.1 User Accounts
+## 5.1 User Accounts (Implemented)
 
 The system shall allow users to:
 
-* Register an account
-* Log in
-* Log out
-* Manage their profile
+* Register an account with a username, email, and password.
+* Log in with email and password.
+* Log out.
+* View their own profile.
 
-Each user's journal and trading data shall remain private.
+Rules:
+
+* Each user's journal and trading data shall remain private and accessible only
+  to that user.
+* Email addresses and usernames shall be unique; registering an existing one
+  shall be rejected with a `409 Conflict`.
+* Passwords shall be stored only as a one-way hash.
+
+> **Planned:** password reset, email verification, profile editing, and refresh
+> tokens.
 
 ---
 
-## 5.2 Trade Journal
+## 5.2 Trade Journal (Implemented)
 
 The Trade Journal is the core feature of the application.
 
 The system shall allow users to:
 
 * Create trades manually
-* Import trades from CSV files
 * View all recorded trades
+* View a single trade's details
 * Edit existing trades
 * Delete trades
-* View detailed trade information
-
-Trades created manually and trades imported from CSV shall behave identically once stored in the system.
 
 Each trade shall support the following information:
 
-* Instrument
-* Direction (Long / Short)
-* Entry price
-* Exit price
-* Quantity
-* Entry date and time
-* Exit date and time
-* Profit / Loss
-* Commission
-* Trade duration
+| Field | Entered or derived | Notes |
+|---|---|---|
+| Instrument | Entered | Free text, max 20 characters |
+| Direction | Entered | Long or Short (the enum also reserves Sideways) |
+| Quantity | Entered | Whole number of units |
+| Entry price | Entered | Decimal |
+| Exit price | Entered | Decimal |
+| Entry date and time | Entered | Stored in UTC |
+| Exit date and time | Entered | Stored in UTC |
+| Commission | Entered (optional) | Defaults to a per-unit rate × quantity |
+| Profit / Loss | **Derived** | Computed by the server (see below) |
+| Trade duration | **Derived** | Exit time − entry time |
+
+Rules:
+
+* A trade always belongs to exactly one user.
+* Profit/loss shall be computed by the server as
+  `(exit − entry) × quantity − commission` for a Long trade, inverted for a
+  Short trade. The client never supplies profit/loss.
+* When no commission is supplied, the server applies a default per-unit rate
+  (currently `1.82 × quantity`).
+* Editing a trade shall recompute its profit/loss from the stored values.
+
+> **Planned:** CSV import (created and imported trades behave identically once
+> stored).
 
 ---
 
-## 5.3 CSV Import
+## 5.3 Dashboard (Implemented)
+
+The dashboard provides a high-level overview of the trader's performance. It
+shall display:
+
+* Total trades
+* Net profit/loss
+* Win rate
+* Gross profit and gross loss
+* Total commission paid
+* Average winning trade
+* Average losing trade
+* Profit factor
+* Best trade and worst trade
+* An equity curve
+* A recent-trades table
+
+Metrics shall be derived from the user's full trade history and update
+automatically whenever trades are created, edited, or deleted.
+
+> **Planned:** daily profit/loss, best/worst trading day, trade frequency, and
+> server-side statistics for large histories.
+
+---
+
+## 5.4 Search, Filtering & Sorting (Implemented)
+
+Users shall be able to:
+
+* Search trades by instrument (case-insensitive substring match).
+* Filter trades by direction (Long / Short).
+* Filter trades by exit-date range.
+* Filter with multiple criteria simultaneously.
+* Sort the trade table by instrument, exit time, or profit/loss.
+
+> **Planned:** search and filter by notes, tags, and profit/loss.
+
+---
+
+## 5.5 CSV Import (Planned)
 
 The system shall allow users to import completed trades from CSV files as an alternative to manual trade entry.
 
@@ -135,7 +214,7 @@ The import system should be extensible to support additional broker formats in f
 
 ---
 
-## 5.4 Trade Notes
+## 5.6 Trade Notes (Planned)
 
 Users shall be able to attach personal notes to every trade.
 
@@ -151,7 +230,7 @@ Notes shall remain editable at any time.
 
 ---
 
-## 5.5 Screenshot Management
+## 5.7 Screenshot Management (Planned)
 
 Users shall be able to upload one or more screenshots for each trade.
 
@@ -164,7 +243,7 @@ Example screenshots include:
 
 ---
 
-## 5.6 Trade Tags
+## 5.8 Trade Tags (Planned)
 
 Users shall be able to assign custom tags to trades.
 
@@ -182,85 +261,32 @@ Tags shall be searchable and filterable.
 
 ---
 
-## 5.7 Dashboard
-
-The dashboard provides a high-level overview of the trader's performance.
-
-Displayed information shall include:
-
-* Total Profit/Loss
-* Daily Profit/Loss
-* Number of Trades
-* Win Rate
-* Average Winning Trade
-* Average Losing Trade
-* Profit Factor
-* Best Trading Day
-* Worst Trading Day
-* Recent Trades
-
-The dashboard shall present these metrics using summary cards and visual charts.
-
----
-
-## 5.8 Performance Analytics
-
-The system shall automatically calculate trading statistics based on all recorded trades.
-
-Supported analytics include:
-
-* Equity Curve
-* Daily Profit/Loss
-* Win Rate
-* Average Winning Trade
-* Average Losing Trade
-* Profit Factor
-* Trade Frequency
-
-Statistics shall automatically update whenever trades are created, modified, imported, or deleted.
-
----
-
-## 5.9 Search
-
-Users shall be able to search trades by:
-
-* Instrument
-* Notes
-* Tags
-
----
-
-## 5.10 Filtering
-
-Users shall be able to filter trades by:
-
-* Date range
-* Instrument
-* Direction
-* Profit/Loss
-* Tags
-
-Multiple filters should be usable simultaneously.
-
----
-
 # 6. User Workflows
 
-## Manual Trade Entry
+## Manual Trade Entry (Implemented)
 
 1. Log in.
-2. Create a new trade.
-3. Enter trade details.
-4. Add notes.
-5. Upload screenshots.
-6. Assign tags.
-7. Save the trade.
-8. Review updated dashboard statistics.
+2. Open the **Trades** page.
+3. Choose **Add trade**.
+4. Enter the instrument, direction, quantity, entry/exit prices, and entry/exit
+   times.
+5. Optionally override the pre-filled commission.
+6. Save the trade.
+7. Review the updated dashboard statistics.
 
 ---
 
-## CSV Import
+## Reviewing Performance (Implemented)
+
+1. Log in.
+2. Open the dashboard to see net profit/loss, win rate, profit factor, average
+   win/loss, and the equity curve.
+3. Open the **Trades** page to search, filter, and sort the underlying trades.
+4. Edit or delete a trade and watch the metrics update.
+
+---
+
+## CSV Import (Planned)
 
 1. Log in.
 2. Upload a CSV file.
@@ -274,34 +300,39 @@ Multiple filters should be usable simultaneously.
 
 # 7. Non-Functional Requirements
 
-The application should:
+The application shall:
 
-* Support thousands of recorded trades.
-* Import large CSV files efficiently.
-* Provide fast search and filtering.
-* Preserve user data reliably.
-* Be responsive on desktop and tablet devices.
-* Be deployable as a self-hosted application using a single executable.
+* **[Implemented]** Persist data reliably in an embedded database file, with no
+  database server to install or operate.
+* **[Implemented]** Isolate every user's data; a user can never read or modify
+  another user's trades.
+* **[Implemented]** Require authentication for all trade data.
+* **[Implemented]** Be responsive on desktop and tablet devices.
+* **[Implemented]** Be deployable as a self-hosted, single executable that serves
+  both the API and the web UI.
+* **[Planned]** Support thousands of recorded trades efficiently.
+* **[Planned]** Import large CSV files efficiently.
+* **[Planned]** Provide fast search and filtering over large histories.
 
 ---
 
-# 8. Minimum Viable Product (MVP)
+# 8. Release Status (MVP)
 
-The first release shall include:
-
-* User authentication
-* Manual trade entry
-* CSV trade import
-* Trade journal
-* Trade notes
-* Screenshot uploads
-* Custom tags
-* Search and filtering
-* Dashboard
-* Equity curve
-* Daily Profit/Loss
-* Win Rate
-* Basic performance statistics
+| Area | Status |
+|---|---|
+| User authentication | Implemented |
+| Manual trade entry | Implemented |
+| Trade journal (CRUD) | Implemented |
+| Server-side profit/loss & commission | Implemented |
+| Dashboard & performance statistics | Implemented |
+| Equity curve | Implemented |
+| Search, filtering & sorting | Implemented |
+| Light / dark theme | Implemented |
+| CSV trade import | Planned |
+| Trade notes | Planned |
+| Screenshot uploads | Planned |
+| Custom tags | Planned |
+| Daily profit/loss & best/worst day | Planned |
 
 ---
 
