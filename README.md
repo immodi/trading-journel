@@ -1,96 +1,265 @@
 # Trading Journal
 
-Trading Journal is a full-stack web application that gives traders a centralized place to document, organize, and analyze their trading activity. It replaces spreadsheets and scattered notes with a structured journal where every trade is recorded, annotated, and measured, turning raw trade history into actionable performance insight.
+[![CI](https://github.com/immodi/trading-journel/actions/workflows/ci.yml/badge.svg)](https://github.com/immodi/trading-journel/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+[![.NET](https://img.shields.io/badge/.NET-10-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
+[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
 
-The application is built for individual retail traders across futures, forex, stocks, options, and cryptocurrency. It does not execute trades or connect to live markets—its focus is entirely on post-trade review and continuous improvement.
+A full-stack trade journal for retail traders. Log every trade, let the server
+compute profit/loss and commission, and watch a performance dashboard — win
+rate, profit factor, average win/loss, and an equity curve — update as you go.
+
+The app is a complete vertical slice of a real product: a typed React SPA, a
+layered ASP.NET Core API, JWT authentication with per-user data isolation, an
+EF Core persistence layer with migrations, and a test suite wired into CI.
+
+> Status: the authentication and trade-journal core is implemented and covered
+> by tests. Analytics, CSV import, and trade annotations are on the
+> [roadmap](#roadmap).
+
+---
 
 ## Features
 
-### Trade Journal
+- **Authentication** — register / login with JWT access tokens. Passwords are
+  hashed with ASP.NET Core Identity's PBKDF2 hasher; every API call is
+  authenticated and scoped to the signed-in user.
+- **Trade journal** — create, edit, and delete trades with instrument,
+  direction (Long/Short), quantity, entry/exit prices, entry/exit times, and a
+  per-trade commission.
+- **Server-side P/L** — profit/loss is calculated by the API from entry/exit
+  prices, quantity, and commission, so every client shows identical numbers.
+  Commission defaults to a per-unit rate and can be overridden on create or
+  edit; input is validated on both ends.
+- **Dashboard** — net P/L, win rate, profit factor, average win, average loss,
+  total trades, commission, plus a dependency-free SVG equity curve and a
+  recent-trades table. All metrics are derived from your trade history.
+- **Search & filtering** — search by instrument and filter by direction and
+  date range; sort the table by instrument, exit time, or P/L.
+- **Polished UI** — responsive layout, accessible shadcn-style components,
+  loading skeletons, and empty states throughout.
+- **Light & dark themes** — a persisted theme toggle (light / dark / system,
+  following the OS by default) with no flash of the wrong theme on load.
 
-The core of the application is a complete trade journal. Users can create trades manually or import them from CSV files, and both sources behave identically once stored. Each trade captures instrument, direction (Long/Short), entry and exit prices, quantity, entry and exit timestamps, profit/loss, commission, and trade duration.
-
-### CSV Import
-
-Completed trades can be imported from CSV files as an alternative to manual entry. The import process validates uploaded files, parses trade records, detects duplicates, stores valid records, and reports invalid ones. The import system is extensible to support additional broker formats.
-
-### Notes, Screenshots, and Tags
-
-Every trade supports rich annotation:
-
-- **Notes** for trade rationale, mistakes made, emotional state, lessons learned, and market observations—editable at any time.
-- **Screenshots** for entry charts, exit charts, trade setups, and higher timeframe analysis.
-- **Custom tags** such as Breakout, Reversal, News, A+, FOMO, Revenge Trade, and Scalping—all searchable and filterable.
-
-### Dashboard and Performance Analytics
-
-A dashboard provides a high-level overview of trading performance, including total profit/loss, daily profit/loss, number of trades, win rate, average winning trade, average losing trade, profit factor, best and worst trading days, and recent trades. These metrics are presented through summary cards and visual charts.
-
-Performance analytics are calculated automatically from all recorded trades and include an equity curve, daily profit/loss, win rate, average winning and losing trades, profit factor, and trade frequency. Statistics update automatically whenever trades are created, modified, imported, or deleted.
-
-### Search and Filtering
-
-Trades can be searched by instrument, notes, and tags, and filtered by date range, instrument, direction, profit/loss, and tags. Multiple filters can be applied simultaneously.
-
-## Technology Stack
+## Tech stack
 
 ### Backend
 
 | Technology | Purpose |
 |---|---|
-| .NET 10 | Application Framework |
-| ASP.NET Core | REST API & Static File Hosting |
-| Entity Framework Core | ORM |
-| SQL Server | Relational Database |
-| JWT Authentication | User Authentication |
-| FluentValidation | Request Validation |
-| Serilog | Structured Logging |
+| .NET 10 / ASP.NET Core | REST API & static file hosting |
+| Entity Framework Core 10 | ORM & migrations |
+| SQLite | Database (swappable via EF Core providers) |
+| JWT bearer authentication | Stateless auth |
+| xUnit, Moq & FluentAssertions | Unit & integration tests |
 
 ### Frontend
 
 | Technology | Purpose |
 |---|---|
-| React | User Interface |
-| TypeScript | Type Safety |
-| Vite | Development Server & Build Tool |
-| React Router | Client-side Routing |
-| TanStack Query | Server State Management |
+| React 19 | UI |
+| TypeScript | Type safety |
+| Vite | Dev server & build tool |
+| React Router | Client-side routing |
+| TanStack Query | Server state & caching |
+| Tailwind CSS v4 + Base UI | Styling & accessible primitives |
 
 ## Architecture
 
-The application follows a client-server architecture: a React frontend communicates over HTTP with an ASP.NET Core backend, which persists data to SQL Server. The backend handles authentication, business logic, data validation, file uploads, statistics calculation, and data persistence. The frontend handles the user interface, form validation, data visualization, and user interaction.
+Client-server: a React SPA talks to an ASP.NET Core API over JSON. The API owns
+all business rules — authentication, validation, P/L calculation, and
+persistence — so the frontend stays a thin presentation layer.
 
-The backend follows a Vertical Slice Architecture, where each feature owns its API endpoints, business logic, validation, and persistence. Feature slices include Authentication, Dashboard, Trades, Import, Statistics, Tags, Notes, and Uploads.
+The backend is split into four projects with a strict dependency direction:
 
-## Deployment
+```
+Domain        entities & enums       (no dependencies)
+   ▲
+Application   DTOs, requests,        (depends on Domain)
+              service/repo interfaces
+   ▲
+Infrastructure persistence, services, (depends on Application + Domain)
+              JWT, EF Core, migrations
+   ▲
+Api           controllers, exception  (depends on Infrastructure)
+              handling, composition root
+```
 
-During development, React runs on the Vite development server while ASP.NET Core hosts the REST API, with Vite proxying API requests to the backend. In production, React is compiled into static assets copied into the ASP.NET application's `wwwroot` directory. ASP.NET Core then serves both the frontend and backend from a single executable, requiring no Node.js runtime after publishing.
+The frontend mirrors this with clear seams: `api/` (HTTP), `hooks/` (server
+state), `lib/` (pure helpers such as analytics and formatting), `components/`
+(presentation), and `pages/`.
 
-The final deployment consists of one executable and one SQL Server database.
+### Current data model
 
-## Security
+The implemented schema is `Users` and `Trades` (one user → many trades, cascade
+delete). The [full domain model](./docs/entity_diagram.png) — including tags,
+notes, screenshots, and CSV import history — is captured in the design docs and
+tracked on the roadmap.
 
-Authentication is implemented using JWT access tokens and refresh tokens, with passwords securely hashed before storage. All authenticated endpoints require a valid access token. The application implements password hashing, authorization policies, input validation, file upload validation, HTTPS enforcement, and CORS configuration.
-
-## Getting Started
+## Getting started
 
 ### Prerequisites
 
-- .NET 10 SDK
-- SQL Server
-- Node.js (development only)
+- [.NET 10 SDK](https://dotnet.microsoft.com/download)
+- [Node.js](https://nodejs.org/) 20.19+ (or 22.12+) and [pnpm](https://pnpm.io/)
+- No database server required — SQLite is created automatically on first run.
 
-### Development Setup
+### 1. Run the API
 
-1. Clone the repository.
-2. Configure the SQL Server connection string.
-3. Run the backend API.
-4. Run the Vite development server for the frontend.
-5. Access the application through the Vite dev server, which proxies API requests to the backend.
+```bash
+cd backend
+dotnet restore
+dotnet run --project Api
+```
 
-### Production Build
+The API starts on <http://localhost:5067>. On startup it applies EF Core
+migrations and creates `backend/Api/db.db`. Development configuration
+(connection string and a throwaway JWT signing key) lives in
+`Api/appsettings.Development.json`.
 
-1. Build the React frontend to generate static assets.
-2. Copy the generated assets into the ASP.NET application's `wwwroot` directory.
-3. Publish the ASP.NET Core application as a single executable.
-4. Deploy alongside a SQL Server database.
+### 2. Run the frontend
+
+```bash
+cd frontend
+pnpm install
+pnpm dev
+```
+
+Open <http://localhost:5173>, register an account, and log your first trade.
+During development the SPA talks to the API on `:5067` (see
+`frontend/.env.development`).
+
+## Configuration
+
+| Setting | Location | Notes |
+|---|---|---|
+| `ConnectionStrings:Default` | `backend/Api/appsettings*.json` | SQLite connection string |
+| `JwtSettings:Secret` | `backend/Api/appsettings*.json` | ≥ 32 bytes; see below |
+| `JwtSettings:Issuer` / `Audience` | `backend/Api/appsettings*.json` | Token issuer/audience |
+| `VITE_API_URL` | `frontend/.env.development` | API base URL for dev; leave unset in production |
+
+For production, provide the signing key as an environment variable so it never
+lands in source control:
+
+```bash
+JwtSettings__Secret="<a long random secret>" dotnet run --project Api
+```
+
+If no secret is configured, the app generates a 48-byte key on first run and
+persists it to `jwt-secret.key` next to the binary (reused on later starts). A
+configured secret shorter than 32 bytes fails fast at startup.
+
+## API reference
+
+All trade endpoints require an `Authorization: Bearer <token>` header and only
+operate on the caller's own data.
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/auth/register` | Create an account, returns a JWT |
+| `POST` | `/api/auth/login` | Exchange credentials for a JWT |
+| `GET` | `/api/auth/me` | Current user's profile |
+| `GET` | `/api/trade` | List the current user's trades |
+| `GET` | `/api/trade/{id}` | Get a single trade |
+| `POST` | `/api/trade` | Create a trade |
+| `PUT` | `/api/trade/{id}` | Update a trade |
+| `DELETE` | `/api/trade/{id}` | Delete a trade |
+
+Errors are returned as a consistent JSON body: `{ "code": 404, "message": "…" }`.
+Unhandled exceptions are translated to the right status code by a global
+exception handler.
+
+## Testing
+
+```bash
+# Backend: 29 xUnit tests (services, repositories, password hashing)
+cd backend
+dotnet test
+
+# Frontend: type-check, lint, and production build
+cd frontend
+pnpm lint
+pnpm build
+```
+
+Both suites run on every push and pull request via
+[GitHub Actions](./.github/workflows/ci.yml).
+
+## Project structure
+
+```
+backend/
+  Domain/           entities, enums
+  Application/      DTOs, requests, interfaces, mappers
+  Infrastructure/   EF Core, repositories, services, JWT, migrations
+  Api/              controllers, exception handling, Program.cs
+  Infrastructure.Tests/  unit & integration tests
+frontend/
+  src/api/          HTTP clients
+  src/hooks/        auth, theme & trade server state
+  src/lib/          analytics, formatting, datetime helpers
+  src/components/   layout, dashboard, trades, ui primitives
+  src/pages/        route screens
+docs/               business requirements, technical doc, domain diagram
+```
+
+## Production build
+
+`dotnet publish` produces a single, self-contained executable that serves both
+the SPA and the API — no separate web server, no .NET runtime required on the
+target machine:
+
+```bash
+dotnet publish backend/Api/Api.csproj \
+  -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true \
+  -o ./publish
+```
+
+(For any runtime-specific publish, `SelfContained` and `PublishSingleFile`
+default to `true`, so `dotnet publish backend/Api/Api.csproj -c Release -r linux-x64`
+is enough.)
+
+How it fits together:
+
+- The `PublishFrontend` MSBuild target runs `pnpm install` + `pnpm build` and
+  adds the SPA to the publish payload under `wwwroot` (requires Node.js + pnpm
+  on the build machine; skip with `-p:SkipFrontendBuild=true`).
+- Native libraries such as SQLite are bundled for self-extraction, and the
+  content root is anchored to the executable — so the app serves `wwwroot` no
+  matter which directory you launch it from.
+- The SPA is built with `VITE_API_URL` empty, so it calls the API on its own
+  origin. For a split deployment, bake in a different URL with
+  `-p:FrontendApiUrl=https://api.example.com`.
+- Transfers are one executable, its `wwwroot`, and a SQLite file created on
+  first run. Swap the EF Core provider for SQL Server or PostgreSQL if you need
+  a server database.
+
+Run it:
+
+```bash
+cd publish
+./Api --urls http://0.0.0.0:8080     # or ASPNETCORE_URLS=http://0.0.0.0:8080
+```
+
+## Roadmap
+
+- CSV import with duplicate detection and per-broker parsers
+- Trade tags, notes, and chart screenshots
+- A dedicated statistics endpoint so analytics can be paginated/aggregated
+  server-side for large histories
+- Refresh tokens and role-based access control for the user-admin endpoints
+- Swap SQLite for a server database in production
+
+## Documentation
+
+- [Business requirements](./docs/business_requirements.md)
+- [Technical design](./docs/technical_document.md)
+- [Domain diagram](./docs/entity_diagram.png)
+
+## License
+
+Released under the [MIT License](./LICENSE).
+
+Built by [Ahmed Yasser (@immodi)](https://github.com/immodi).

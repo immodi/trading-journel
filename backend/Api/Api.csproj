@@ -6,32 +6,78 @@
         <ImplicitUsings>enable</ImplicitUsings>
     </PropertyGroup>
 
+    <!--
+      Publishing a runtime-specific build produces a single, self-contained
+      executable by default so the app can be dropped on a machine and run.
+      Override with -p:PublishSingleFile=false / -p:SelfContained=false.
+    -->
+    <PropertyGroup Condition="'$(RuntimeIdentifier)' != ''">
+        <SelfContained Condition="'$(SelfContained)' == ''">true</SelfContained>
+        <PublishSingleFile Condition="'$(PublishSingleFile)' == ''">true</PublishSingleFile>
+    </PropertyGroup>
+
+    <!--
+      Single-file publishes bundle managed assemblies, but native libraries
+      (for example SQLite's libe_sqlite3.so) must be marked for self-extraction
+      or they are silently dropped and the app crashes at startup.
+    -->
+    <PropertyGroup Condition="'$(PublishSingleFile)' == 'true'">
+        <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <FrontendDirectory>$(MSBuildProjectDirectory)/../../frontend</FrontendDirectory>
+        <!--
+          API base URL baked into the SPA. Empty means "same origin", which is
+          correct for the published app (it serves both the SPA and the API).
+          Override with -p:FrontendApiUrl=https://api.example.com for split
+          deployments.
+        -->
+        <FrontendApiUrl Condition="'$(FrontendApiUrl)' == ''"></FrontendApiUrl>
+    </PropertyGroup>
+
     <ItemGroup>
-        <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.7"/>
-        <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.9">
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.13"/>
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.13">
           <PrivateAssets>all</PrivateAssets>
           <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.9" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <Folder Include="wwwroot\" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.13" />
     </ItemGroup>
 
     <ItemGroup>
       <ProjectReference Include="..\Infrastructure\Infrastructure.csproj" />
     </ItemGroup>
-    
-    <Target Name="BuildFrontend" BeforeTargets="Publish">
-        <Exec WorkingDirectory="../../frontend" Command="pnpm build" />
+
+    <!--
+      Build the React app and add its output to the publish payload under
+      wwwroot, so the published app serves the SPA itself. The item glob is
+      evaluated inside the target (after the frontend build) which is why this
+      cannot be a plain <Content> item.
+
+      Skip the frontend build with -p:SkipFrontendBuild=true (an existing
+      frontend/dist is still copied).
+    -->
+    <Target Name="PublishFrontend" BeforeTargets="ComputeFilesToPublish">
+        <Exec Condition="'$(SkipFrontendBuild)' != 'true'"
+              WorkingDirectory="$(FrontendDirectory)"
+              Command="pnpm install --frozen-lockfile" />
+        <Exec Condition="'$(SkipFrontendBuild)' != 'true'"
+              WorkingDirectory="$(FrontendDirectory)"
+              Command="pnpm build"
+              EnvironmentVariables="VITE_API_URL=$(FrontendApiUrl)" />
 
         <ItemGroup>
-            <FrontendFiles Include="../../frontend/dist/**" />
+            <FrontendDist Include="$(FrontendDirectory)/dist/**" />
+            <ResolvedFileToPublish Include="@(FrontendDist->'%(FullPath)')">
+                <RelativePath>wwwroot/%(RecursiveDir)%(Filename)%(Extension)</RelativePath>
+                <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+                <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+            </ResolvedFileToPublish>
         </ItemGroup>
 
-        <Copy
-                SourceFiles="@(FrontendFiles)"
-                DestinationFiles="@(FrontendFiles->'$(PublishDir)wwwroot/%(RecursiveDir)%(Filename)%(Extension)')" />
+        <Warning Condition="!Exists('$(FrontendDirectory)/dist/index.html')"
+                 Text="No frontend build found at $(FrontendDirectory)/dist. The published app will not serve the SPA. Run 'pnpm build' in the frontend directory." />
     </Target>
+
 </Project>

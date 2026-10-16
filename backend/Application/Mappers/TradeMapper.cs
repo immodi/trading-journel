@@ -7,6 +7,12 @@ namespace Application.Mappers;
 
 public static class TradeMapper
 {
+        /// <summary>
+        /// Flat commission charged per unit (contract/share) used when a trade
+        /// is created without an explicit commission.
+        /// </summary>
+        private const decimal CommissionPerUnit = 1.82m;
+
         public static TradeDto ToDto(this Trade trade)
         {
             return new TradeDto
@@ -16,7 +22,7 @@ public static class TradeMapper
                 Instrument = trade.Instrument,
                 EntryTime = trade.EntryTime,
                 ExitTime = trade.ExitTime,
-                Commission = new decimal(1.82) * trade.Quantity,
+                Commission = trade.Commission,
                 Direction = trade.Direction,
                 EntryPrice = trade.EntryPrice,
                 CreatedAt = trade.CreatedAt,
@@ -27,13 +33,13 @@ public static class TradeMapper
             };
         }
 
-        public static Trade ToEntity(this CreateTradeRequest request)
+        public static Trade ToEntity(this CreateTradeRequest request, int userId)
         {
-            var commission = new decimal(1.82) * request.Quantity;
+            var commission = request.Commission ?? CommissionPerUnit * request.Quantity;
             return new Trade
             {
                 Instrument = request.Instrument,
-                UserId = request.UserId,
+                UserId = userId,
                 Direction = request.Direction,
                 EntryPrice = request.EntryPrice,
                 ExitPrice = request.ExitPrice,

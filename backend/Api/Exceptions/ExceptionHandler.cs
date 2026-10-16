@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Diagnostics;
 
 namespace Api.Exceptions;
 
-public sealed class ExceptionHandler : IExceptionHandler
+public sealed class ExceptionHandler(ILogger<ExceptionHandler> logger) : IExceptionHandler
 {
     public async ValueTask<bool> TryHandleAsync(
         HttpContext context,
@@ -17,6 +17,11 @@ public sealed class ExceptionHandler : IExceptionHandler
             ArgumentException => StatusCodes.Status400BadRequest,
             _ => StatusCodes.Status500InternalServerError
         };
+
+        if (statusCode == StatusCodes.Status500InternalServerError)
+        {
+            logger.LogError(exception, "Unhandled exception for {Method} {Path}", context.Request.Method, context.Request.Path);
+        }
 
         var response = new ErrorResponse(
             statusCode,

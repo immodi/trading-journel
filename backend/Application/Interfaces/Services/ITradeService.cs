@@ -5,9 +5,9 @@ namespace Application.Interfaces.Services;
 
 public interface ITradeService
 {
-    Task<IEnumerable<TradeDto>> GetAllAsync();
-    Task<TradeDto?> GetByIdAsync(int id);
-    Task AddAsync(CreateTradeRequest request);
-    Task UpdateAsync(int id, UpdateTradeRequest request);
-    Task DeleteAsync(int id);
+    Task<IEnumerable<TradeDto>> GetAllAsync(int userId);
+    Task<TradeDto?> GetByIdAsync(int userId, int id);
+    Task<TradeDto> AddAsync(int userId, CreateTradeRequest request);
+    Task UpdateAsync(int userId, int id, UpdateTradeRequest request);
+    Task DeleteAsync(int userId, int id);
 }

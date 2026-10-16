@@ -1,6 +1,46 @@
 @Api_HostAddress = http://localhost:5067
+@token = paste-a-jwt-from-the-login-response-here
 
-GET {{Api_HostAddress}}/weatherforecast/
-Accept: application/json
+### Register a new account
+POST {{Api_HostAddress}}/api/auth/register
+Content-Type: application/json
+
+{
+  "username": "demo",
+  "email": "demo@example.com",
+  "password": "Passw0rd!123"
+}
+
+### Log in
+POST {{Api_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "demo@example.com",
+  "password": "Passw0rd!123"
+}
+
+### Current user
+GET {{Api_HostAddress}}/api/auth/me
+Authorization: Bearer {{token}}
+
+### List trades
+GET {{Api_HostAddress}}/api/trade
+Authorization: Bearer {{token}}
+
+### Create a trade
+POST {{Api_HostAddress}}/api/trade
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "instrument": "MNQ",
+  "direction": 0,
+  "entryPrice": 18000,
+  "exitPrice": 18025,
+  "quantity": 2,
+  "entryTime": "2026-05-01T13:30:00Z",
+  "exitTime": "2026-05-01T14:05:00Z"
+}
 
 ###

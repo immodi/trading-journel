@@ -9,7 +9,7 @@ public class Trade
     
     public int UserId { get; set; }
 
-    public User User { get; set; }
+    public User? User { get; set; }
 
     public string Instrument { get; set; } = string.Empty;
     

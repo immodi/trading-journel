@@ -1,75 +1,68 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-
-import { login } from "@/api/auth";
-import { TokenStorage } from "@/utils/tokenStorage";
-
+import { useState, type FormEvent } from "react";
+import { Loader2 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { getErrorMessage } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export function LoginForm() {
-    const navigate = useNavigate();
+    const { login } = useAuth();
 
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
-
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 
-    async function handleSubmit(e: React.SubmitEvent) {
-        e.preventDefault();
+    async function handleSubmit(event: FormEvent) {
+        event.preventDefault();
 
         setLoading(true);
         setError("");
 
-        const result = await login({
-            email,
-            password,
-        });
-
-        if ("token" in result) {
-            TokenStorage.set(result.token);
-            navigate("/");
-        } else {
-            setError(result.message);
+        try {
+            await login({ email, password });
+        } catch (loginError) {
+            setError(getErrorMessage(loginError));
+            setLoading(false);
         }
-
-        setLoading(false);
     }
 
     return (
-        <form
-            onSubmit={handleSubmit}
-            className="mt-6 space-y-4"
-        >
-            <Input
-                type="email"
-                placeholder="Email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-            />
+        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+            <div className="grid gap-2">
+                <Label htmlFor="login-email">Email</Label>
+                <Input
+                    id="login-email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                />
+            </div>
 
-            <Input
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-            />
+            <div className="grid gap-2">
+                <Label htmlFor="login-password">Password</Label>
+                <Input
+                    id="login-password"
+                    type="password"
+                    autoComplete="current-password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                />
+            </div>
 
             {error && (
                 <Alert variant="destructive">
-                    <AlertDescription>
-                        {error}
-                    </AlertDescription>
+                    <AlertDescription>{error}</AlertDescription>
                 </Alert>
             )}
 
-            <Button
-                className="w-full"
-                disabled={loading}
-                type="submit"
-            >
+            <Button className="w-full" disabled={loading} type="submit">
+                {loading && <Loader2 className="animate-spin" />}
                 {loading ? "Signing in..." : "Login"}
             </Button>
         </form>

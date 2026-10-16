@@ -222,4 +222,52 @@ public class TradeRepositoryTests
 
         deleted.Should().BeNull();
     }
+
+    [Fact]
+    public async Task GetByUserIdAsync_Should_Only_Return_Trades_For_That_User()
+    {
+        await using var context = DbContextFactory.Create();
+        var repository = new TradeRepository(context);
+
+        var owner = new User { Username = "owner", Email = "owner@test.com", PasswordHash = "hash" };
+        var other = new User { Username = "other", Email = "other@test.com", PasswordHash = "hash" };
+
+        context.Users.AddRange(owner, other);
+        await context.SaveChangesAsync();
+
+        await repository.AddAsync(new Trade
+        {
+            UserId = owner.Id,
+            Instrument = "OWNED",
+            Direction = Direction.Long,
+            EntryPrice = 100,
+            ExitPrice = 110,
+            Quantity = 1,
+            EntryTime = DateTime.UtcNow,
+            ExitTime = DateTime.UtcNow,
+            Commission = 1,
+            ProfitLoss = 9
+        });
+
+        await repository.AddAsync(new Trade
+        {
+            UserId = other.Id,
+            Instrument = "FOREIGN",
+            Direction = Direction.Short,
+            EntryPrice = 200,
+            ExitPrice = 190,
+            Quantity = 1,
+            EntryTime = DateTime.UtcNow,
+            ExitTime = DateTime.UtcNow,
+            Commission = 1,
+            ProfitLoss = 9
+        });
+
+        await repository.SaveChangesAsync();
+
+        var result = await repository.GetByUserIdAsync(owner.Id);
+
+        result.Should().ContainSingle();
+        result.Single().Instrument.Should().Be("OWNED");
+    }
 }

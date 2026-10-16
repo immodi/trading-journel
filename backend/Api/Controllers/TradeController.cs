@@ -1,3 +1,4 @@
+using Api.Extensions;
 using Application.Interfaces.Services;
 using Application.Requests.Trade;
 using Application.Responses;
@@ -14,18 +15,17 @@ public class TradeController(ITradeService tradeService) : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
-        var trades = await tradeService.GetAllAsync();
+        var trades = await tradeService.GetAllAsync(User.GetUserId());
         return Ok(trades);
     }
 
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById(int id)
     {
-        var trade = await tradeService.GetByIdAsync(id);
+        var trade = await tradeService.GetByIdAsync(User.GetUserId(), id);
 
         if (trade is null)
-            return NotFound(
-                new ErrorResponse(404, "Trade not found"));
+            return NotFound(new ErrorResponse(404, "Trade not found"));
 
         return Ok(trade);
     }
@@ -33,15 +33,15 @@ public class TradeController(ITradeService tradeService) : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create(CreateTradeRequest request)
     {
-        await tradeService.AddAsync(request);
+        var trade = await tradeService.AddAsync(User.GetUserId(), request);
 
-        return Created();
+        return CreatedAtAction(nameof(GetById), new { id = trade.Id }, trade);
     }
 
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, UpdateTradeRequest request)
     {
-        await tradeService.UpdateAsync(id, request);
+        await tradeService.UpdateAsync(User.GetUserId(), id, request);
 
         return NoContent();
     }
@@ -49,7 +49,7 @@ public class TradeController(ITradeService tradeService) : ControllerBase
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {
-        await tradeService.DeleteAsync(id);
+        await tradeService.DeleteAsync(User.GetUserId(), id);
 
         return NoContent();
     }

@@ -10,7 +10,14 @@ public class Program
 {
     public static void Main(string[] args)
     {
-        var builder = WebApplication.CreateBuilder(args);
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+        {
+            Args = args,
+            // Resolve content root (appsettings + wwwroot) next to the binary
+            // rather than the current working directory, so the published,
+            // self-contained app can be run from anywhere.
+            ContentRootPath = AppContext.BaseDirectory,
+        });
 
         builder.Services.AddCors(options =>
         {
@@ -45,7 +52,11 @@ public class Program
         app.UseExceptionHandler();
 
         app.ApplyMigrations();
-        app.UseHttpsRedirection();
+
+        if (!app.Environment.IsDevelopment())
+        {
+            app.UseHttpsRedirection();
+        }
 
         app.UseCors("frontend");
 
@@ -55,6 +66,20 @@ public class Program
         app.UseAuthentication();
         app.UseAuthorization();
         app.MapControllers();
+
+        // Unknown API routes should return JSON, not the SPA shell.
+        app.MapFallback("/api/{**slug}", () =>
+            Results.NotFound(new Application.Responses.ErrorResponse(
+                404, "The requested API endpoint was not found.")));
+
+        // Serve the React single-page app for client-side routes and
+        // deep links that do not match an API endpoint (production build).
+        // Guarded so a source-only (no `pnpm build`) run still starts cleanly.
+        var webRoot = app.Environment.WebRootPath;
+        if (!string.IsNullOrEmpty(webRoot) && File.Exists(Path.Combine(webRoot, "index.html")))
+        {
+            app.MapFallbackToFile("index.html");
+        }
 
         app.Run();
     }

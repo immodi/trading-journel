@@ -5,6 +5,15 @@
 **Version:** 1.0
 **Status:** Draft
 
+> **Implementation status.** This document describes the full target design.
+> The repository currently implements the authentication and trade-journal core:
+> JWT auth, per-user trade CRUD with server-side P/L, and the analytics
+> dashboard. It runs on **SQLite** via EF Core (not SQL Server), uses the
+> built-in ASP.NET Core logger (not Serilog), validates requests with
+> data-annotation/request models (not FluentValidation yet), and stores no
+> uploaded files. Items below that are not yet built are tracked in the
+> [roadmap](../README.md#roadmap).
+
 ---
 
 # 1. Overview

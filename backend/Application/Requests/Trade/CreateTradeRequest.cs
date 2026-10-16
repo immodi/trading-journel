@@ -5,7 +5,6 @@ namespace Application.Requests.Trade;
 public class CreateTradeRequest
 {    
     public required string Instrument { get; init; } 
-    public required int UserId { get; init; } 
 
     public required Direction Direction { get; init; }
 
@@ -15,5 +14,10 @@ public class CreateTradeRequest
 
     public required DateTime EntryTime { get; init; }
     public required DateTime ExitTime { get; init; }
-    // public required decimal Commission { get; init; }
+
+    /// <summary>
+    /// Total commission for the trade. When omitted the server applies the
+    /// default (<c>CommissionPerUnit × Quantity</c>).
+    /// </summary>
+    public decimal? Commission { get; init; }
 }

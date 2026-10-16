@@ -1,0 +1,113 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "develop", "feature/**"]
+  pull_request:
+    branches: ["main", "develop"]
+
+jobs:
+  backend:
+    name: Backend (build & test)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore dependencies
+        run: dotnet restore backend/backend.sln
+
+      - name: Build solution
+        run: dotnet build backend/backend.sln --no-restore --configuration Release
+
+      - name: Run tests
+        run: dotnet test backend/backend.sln --no-build --configuration Release --verbosity normal
+
+  frontend:
+    name: Frontend (lint & build)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Build
+        run: pnpm build
+
+  publish:
+    name: Publish (self-contained smoke test)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Publish
+        run: >
+          dotnet publish backend/Api/Api.csproj
+          --configuration Release
+          --runtime linux-x64
+          --self-contained true
+          -p:PublishSingleFile=true
+          --output "${{ runner.temp }}/publish"
+
+      - name: Verify the SPA was bundled
+        run: test -f "${{ runner.temp }}/publish/wwwroot/index.html"
+
+      - name: Smoke test the published app
+        run: |
+          "${{ runner.temp }}/publish/Api" --urls http://127.0.0.1:5099 &
+          for _ in $(seq 1 30); do
+            curl -fsS -o /dev/null http://127.0.0.1:5099/ && break
+            sleep 1
+          done
+          curl -fsS -o /dev/null http://127.0.0.1:5099/login
+          curl -fsS -X POST http://127.0.0.1:5099/api/auth/register \
+            -H 'Content-Type: application/json' \
+            -d '{"username":"ci","email":"ci@example.com","password":"Passw0rd!"}' \
+            | grep -q '"token"'

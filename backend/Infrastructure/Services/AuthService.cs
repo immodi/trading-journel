@@ -3,7 +3,9 @@ using Application.Interfaces.Repositories;
 using Application.Interfaces.Services;
 using Application.Mappers;
 using Application.Requests.Auth;
+using Application.Responses.Auth;
 using Domain.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Services;
 
@@ -26,12 +28,13 @@ public class AuthService(
         return !isValid ? null : jwtTokenService.GenerateToken(user.ToDto());
     }
 
-    public async Task<UserDto?> RegisterAsync(RegisterRequest request)
+    public async Task<RegisterResult> RegisterAsync(RegisterRequest request)
     {
-        var existingUser = await userRepository.GetByEmailAsync(request.Email);
+        if (await userRepository.GetByEmailAsync(request.Email) is not null)
+            return RegisterResult.EmailTaken();
 
-        if (existingUser is not null)
-            return null;
+        if (await userRepository.GetByUsernameAsync(request.Username) is not null)
+            return RegisterResult.UsernameTaken();
 
         var user = new User
         {
@@ -40,9 +43,17 @@ public class AuthService(
             PasswordHash = passwordHasher.HashPassword(request.Password)
         };
 
-        await userRepository.AddAsync(user);
-        await userRepository.SaveChangesAsync();
+        try
+        {
+            await userRepository.AddAsync(user);
+            await userRepository.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            // Unique index violation from a concurrent registration.
+            return RegisterResult.Conflict();
+        }
 
-        return user.ToDto();
+        return RegisterResult.Success(user.ToDto());
     }
 }
