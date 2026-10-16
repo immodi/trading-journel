@@ -1,0 +1,19 @@
+# Build artifacts and local state — never sent to the Docker daemon.
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+**/publish/
+
+# Local databases and generated signing keys
+**/*.db
+**/*.db-shm
+**/*.db-wal
+**/jwt-secret.key
+
+# Git metadata, CI, editor and docs (not needed to build the image)
+.git/
+.github/
+.vscode/
+.idea/
+docs/

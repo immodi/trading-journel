@@ -1,0 +1,20 @@
+name: trading-journal
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: trading-journal
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # At least 32 bytes. Compose reads it from a .env file next to this file
+      # (see .env.example) or from the exported environment; it fails fast if unset.
+      JwtSettings__Secret: ${JwtSettings__Secret:?Set JwtSettings__Secret (at least 32 bytes) in a .env file or the environment}
+    volumes:
+      - trading-journal-data:/app/data
+
+volumes:
+  trading-journal-data:

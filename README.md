@@ -136,6 +136,9 @@ Open <http://localhost:5173>, register an account, and log your first trade.
 During development the SPA talks to the API on `:5067` (see
 `frontend/.env.development`).
 
+Prefer containers? See [Docker](#docker) to build and run the whole app — SPA
+and API — from a single image.
+
 ## Configuration
 
 | Setting | Location | Notes |
@@ -253,6 +256,65 @@ Run it:
 cd publish
 ./Api --urls http://0.0.0.0:8080     # or ASPNETCORE_URLS=http://0.0.0.0:8080
 ```
+
+## Docker
+
+The repository ships a multi-stage [`Dockerfile`](./Dockerfile) that builds the
+SPA, publishes the API, and produces a runtime image that serves both on port
+`8080`. Only Docker is required on the host — no .NET SDK or Node.js.
+
+Build the image:
+
+```bash
+docker build -t trading-journal .
+```
+
+Run it, persisting the SQLite database on a named volume and supplying a signing
+key:
+
+```bash
+docker run -d --name trading-journal \
+  -p 8080:8080 \
+  -e JwtSettings__Secret="<a long random secret>" \
+  -v trading-journal-data:/app/data \
+  trading-journal
+```
+
+Open <http://localhost:8080>.
+
+### Docker Compose
+
+For a one-command setup, [`docker-compose.yml`](./docker-compose.yml) builds the
+same image and wires up the port, the signing key, and a named data volume:
+
+```bash
+cp .env.example .env          # then set JwtSettings__Secret in the new .env
+docker compose up -d --build
+```
+
+Open <http://localhost:8080>. The journal is stored in the
+`trading-journal-data` volume; stop with `docker compose down` (add `-v` to
+delete the data as well). Compose reads the secret from `.env` (ignored by git)
+or the exported environment, and refuses to start when it is unset.
+
+Notes:
+
+- **Signing key.** Pass `JwtSettings__Secret` (at least 32 bytes) so issued
+  tokens stay valid across container rebuilds. Without it the app generates a
+  key at `/app/jwt-secret.key`, which is discarded when the container is
+  recreated.
+- **Data.** The database lives at `/app/data/db.db`; mount a volume there (as
+  above) to keep your journal across restarts. A disposable run can omit the
+  volume: `docker run --rm -p 8080:8080 -e JwtSettings__Secret=... trading-journal`.
+- **TLS.** The container serves plain HTTP on `:8080`. Run it behind a reverse
+  proxy that terminates TLS (or put HTTPS at the edge); with no HTTPS port
+  configured the app serves HTTP directly.
+- **User.** The process runs as the non-root `app` user bundled with the .NET
+  image.
+
+Any app setting can be overridden with the usual `Section__Key` environment
+variable syntax (for example `JwtSettings__Issuer` or
+`ConnectionStrings__Default`); see [Configuration](#configuration).
 
 ## Roadmap
 
