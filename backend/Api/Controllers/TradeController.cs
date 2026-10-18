@@ -38,6 +38,14 @@ public class TradeController(ITradeService tradeService) : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = trade.Id }, trade);
     }
 
+    [HttpPost("import")]
+    public async Task<IActionResult> Import(ImportTradesRequest request)
+    {
+        var imported = await tradeService.ImportAsync(User.GetUserId(), request);
+
+        return Ok(new { imported });
+    }
+
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, UpdateTradeRequest request)
     {

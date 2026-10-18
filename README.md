@@ -16,8 +16,8 @@ layered ASP.NET Core API, JWT authentication with per-user data isolation, an
 EF Core persistence layer with migrations, and a test suite wired into CI.
 
 > Status: the authentication, trade-journal, and analytics core is implemented
-> and covered by tests. CSV import and trade annotations (notes, screenshots,
-> tags) are on the [roadmap](#roadmap).
+> and covered by tests. JSON trade import is available; trade annotations
+> (notes, screenshots, tags) are on the [roadmap](#roadmap).
 
 ---
 
@@ -31,10 +31,14 @@ EF Core persistence layer with migrations, and a test suite wired into CI.
 - **Trade journal** — create, edit, and delete trades with instrument,
   direction (Long/Short), quantity, entry/exit prices, entry/exit times, and an
   association to a market.
+- **Trade import** — bulk-add trades from a `TradeReplay`-style JSON export
+  under a market you choose; every row inherits that market's currency. Invalid
+  files and rows are rejected with a clear message before anything is written.
 - **Server-side P/L** — profit/loss is calculated by the API from entry/exit
   prices, quantity, and commission, so every client shows identical numbers.
-  You supply a per-unit commission on create or edit and the server derives the
-  total (`per unit × quantity`); input is validated on both ends.
+  You supply a per-side commission on create, edit, or import and the server
+  derives the total (`per side × 2 × quantity`); input is validated on both
+  ends.
 - **Dashboard** — net P/L, win rate, profit factor, average win, average loss,
   total trades, commission, plus a dependency-free SVG equity curve and a
   recent-trades table. All metrics are derived from your trade history.
@@ -65,7 +69,7 @@ EF Core persistence layer with migrations, and a test suite wired into CI.
 | TypeScript | Type safety |
 | Vite | Dev server & build tool |
 | React Router | Client-side routing |
-| TanStack Query | Server state & caching |
+| TanStack Query | Server state management |
 | Tailwind CSS v4 + Base UI | Styling & accessible primitives |
 
 ## Architecture
@@ -177,6 +181,7 @@ operate on the caller's own data.
 | `GET` | `/api/trade` | List the current user's trades |
 | `GET` | `/api/trade/{id}` | Get a single trade |
 | `POST` | `/api/trade` | Create a trade |
+| `POST` | `/api/trade/import` | Bulk-import trades into a market (`{ marketId, trades }`) |
 | `PUT` | `/api/trade/{id}` | Update a trade |
 | `DELETE` | `/api/trade/{id}` | Delete a trade |
 
@@ -247,8 +252,8 @@ How it fits together:
   origin. For a split deployment, bake in a different URL with
   `-p:FrontendApiUrl=https://api.example.com`.
 - Transfers are one executable, its `wwwroot`, and a SQLite file created on
-  first run. Swap the EF Core provider for SQL Server or PostgreSQL if you need
-  a server database.
+  first run. SQLite is intentional: it keeps the app a single-file, per-user
+  deployment.
 
 Run it:
 
@@ -318,12 +323,8 @@ variable syntax (for example `JwtSettings__Issuer` or
 
 ## Roadmap
 
-- CSV import with duplicate detection and per-broker parsers
+- Import duplicate detection and support for additional export formats
 - Trade tags, notes, and chart screenshots
-- A dedicated statistics endpoint so analytics can be paginated/aggregated
-  server-side for large histories
-- Refresh tokens and role-based access control for the user-admin endpoints
-- Swap SQLite for a server database in production
 
 ## Documentation
 

@@ -23,10 +23,10 @@ The application replaces spreadsheets and scattered notes with a centralized jou
 
 Trading Journal **does not execute trades or connect to live financial markets**. Its purpose is to support post-trade review and continuous improvement.
 
-> **Current release.** Trades are entered manually and summarized on a
-> performance dashboard. CSV import, trade notes, screenshots, and tags are
-> designed but not yet implemented (see [§5.5–§5.8](#55-csv-import-planned) and
-> [§9](#9-future-enhancements)).
+> **Current release.** Trades are entered manually or imported from a JSON
+> export and summarized on a performance dashboard. Trade notes, screenshots,
+> and tags are designed but not yet implemented (see
+> [§5.5–§5.7](#55-trade-notes-planned) and [§9](#9-future-enhancements)).
 
 ---
 
@@ -40,7 +40,8 @@ The application aims to help traders:
 * **[Implemented]** Review historical trades through search and filtering.
 * **[Implemented]** Identify strengths, weaknesses, and recurring patterns — via
   win rate, profit factor, average win/loss, and the equity curve.
-* **[Planned]** Import trades from CSV files to reduce repetitive data entry.
+* **[Implemented]** Import trades from JSON exports to reduce repetitive data
+  entry.
 * **[Planned]** Attach notes and screenshots to trades.
 * **[Planned]** Organize trades using custom tags.
 
@@ -57,8 +58,8 @@ The application is designed for individual retail traders who trade:
 * Cryptocurrency
 
 Users may trade through any broker or prop firm. Manual entry is always
-available; CSV import (planned) will require brokers to provide a trade-history
-export.
+available, and JSON import can accept a trade-history export from another
+journal.
 
 ---
 
@@ -69,6 +70,7 @@ export.
 * User accounts (register / log in / log out / view profile)
 * Market management (create, view, edit, and delete markets)
 * Manual trade entry and full trade CRUD
+* Bulk trade import from a JSON export (filed under a chosen market)
 * Per-user trade journal where every trade belongs to a market and inherits its
   currency
 * Server-computed profit/loss and commission
@@ -79,7 +81,6 @@ export.
 
 ## Planned
 
-* CSV trade imports
 * Trade notes
 * Screenshot uploads
 * Trade tagging
@@ -165,9 +166,9 @@ Each trade shall support the following information:
 | Exit price | Entered | Decimal |
 | Entry date and time | Entered | Stored in UTC |
 | Exit date and time | Entered | Stored in UTC |
-| Commission per unit | Entered | Flat rate charged per unit |
+| Commission per side | Entered | Flat rate charged on each side of the round trip |
 | Currency | **Derived** | Inherited from the trade's market |
-| Commission | **Derived** | `CommissionPerUnit × Quantity`, computed by the server |
+| Commission | **Derived** | `CommissionPerSide × 2 × Quantity`, computed by the server |
 | Profit / Loss | **Derived** | Computed by the server (see below) |
 | Trade duration | **Derived** | Exit time − entry time |
 
@@ -178,13 +179,37 @@ Rules:
 * Profit/loss shall be computed by the server as
   `(exit − entry) × quantity − commission` for a Long trade, inverted for a
   Short trade. The client never supplies profit/loss.
-* The client supplies a **per-unit commission**; the server derives the total
-  commission as `CommissionPerUnit × Quantity`. There is no hard-coded default.
+* The client supplies a **per-side commission**; the server derives the total
+  commission as `CommissionPerSide × 2 × Quantity` (a round trip is charged on
+  both the entry and the exit). There is no hard-coded default.
 * Editing a trade shall re-derive its commission and profit/loss from the stored
   values.
 
-> **Planned:** CSV import (created and imported trades behave identically once
-> stored).
+### Trade Import (Implemented)
+
+Traders who already keep a journal elsewhere shall be able to bulk-add their
+trades from a JSON export without re-entering them by hand. The system shall
+allow users to:
+
+* Choose one of their existing markets and upload a `.json` trade export.
+* See a preview of the parsed file (instrument, trade count, total commission)
+  before confirming.
+* Import every row under the chosen market, in a single batch, at which point
+  the imported trades behave identically to manually created ones.
+
+Rules:
+
+* Every imported trade is filed under the selected market and inherits its
+  currency; the market must belong to the requesting user.
+* The export supplies a **per-side commission**; the server derives each total
+  commission and profit/loss exactly as it does for manual entry.
+* A file that is not valid JSON, is missing its `trades` array, or contains an
+  invalid row (unknown direction, non-whole quantity, negative price or
+  commission, unparseable or reversed times) shall be rejected with a clear
+  message and no partial import.
+
+> **Note:** imported and manually created trades behave identically once
+> stored.
 
 ---
 
@@ -219,8 +244,7 @@ and equity curve in that market's own currency. The recent-trades table and the
 selection are independent, and it formats each trade in its own market currency.
 The application never converts or combines amounts across currencies.
 
-> **Planned:** daily profit/loss, best/worst trading day, trade frequency, and
-> server-side statistics for large histories.
+> **Planned:** daily profit/loss, best/worst trading day, and trade frequency.
 
 ---
 
@@ -238,23 +262,7 @@ Users shall be able to:
 
 ---
 
-## 5.5 CSV Import (Planned)
-
-The system shall allow users to import completed trades from CSV files as an alternative to manual trade entry.
-
-The import process shall:
-
-* Validate uploaded files
-* Parse trade records
-* Detect duplicate trades
-* Store valid records
-* Report invalid records
-
-The import system should be extensible to support additional broker formats in future releases.
-
----
-
-## 5.6 Trade Notes (Planned)
+## 5.5 Trade Notes (Planned)
 
 Users shall be able to attach personal notes to every trade.
 
@@ -270,7 +278,7 @@ Notes shall remain editable at any time.
 
 ---
 
-## 5.7 Screenshot Management (Planned)
+## 5.6 Screenshot Management (Planned)
 
 Users shall be able to upload one or more screenshots for each trade.
 
@@ -283,7 +291,7 @@ Example screenshots include:
 
 ---
 
-## 5.8 Trade Tags (Planned)
+## 5.7 Trade Tags (Planned)
 
 Users shall be able to assign custom tags to trades.
 
@@ -311,7 +319,7 @@ Tags shall be searchable and filterable.
 3. Open the **Trades** page and choose **Add trade**.
 4. Select the market and enter the instrument, direction, quantity, entry/exit
    prices, and entry/exit times.
-5. Enter the per-unit commission; the server derives the total.
+5. Enter the per-side commission; the server derives the total.
 6. Save the trade.
 7. Review the updated dashboard statistics.
 
@@ -330,15 +338,14 @@ Tags shall be searchable and filterable.
 
 ---
 
-## CSV Import (Planned)
+## JSON Trade Import (Implemented)
 
 1. Log in.
-2. Upload a CSV file.
-3. Review parsed trades.
-4. Resolve any validation errors.
-5. Confirm the import.
-6. Add notes, screenshots, and tags as needed.
-7. Review updated dashboard statistics.
+2. Open the **Trades** page and choose **Import**.
+3. Select the market the trades should be filed under.
+4. Upload a `.json` trade export.
+5. Review the preview (instrument, trade count, and total commission).
+6. Confirm the import and review the updated dashboard statistics.
 
 ---
 
@@ -354,9 +361,7 @@ The application shall:
 * **[Implemented]** Be responsive on desktop and tablet devices.
 * **[Implemented]** Be deployable as a self-hosted, single executable that serves
   both the API and the web UI.
-* **[Planned]** Support thousands of recorded trades efficiently.
-* **[Planned]** Import large CSV files efficiently.
-* **[Planned]** Provide fast search and filtering over large histories.
+* **[Implemented]** Import JSON exports of up to 5,000 trades per request.
 
 ---
 
@@ -368,12 +373,12 @@ The application shall:
 | Market management (CRUD) | Implemented |
 | Manual trade entry | Implemented |
 | Trade journal (CRUD) | Implemented |
+| JSON trade import | Implemented |
 | Server-side profit/loss & commission | Implemented |
 | Dashboard & performance statistics | Implemented |
 | Equity curve | Implemented |
 | Search, filtering & sorting | Implemented |
 | Light / dark theme | Implemented |
-| CSV trade import | Planned |
 | Trade notes | Planned |
 | Screenshot uploads | Planned |
 | Custom tags | Planned |

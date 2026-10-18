@@ -1,4 +1,9 @@
-import type { CreateTradeInput, Trade, UpdateTradeInput } from "@/types/models";
+import type {
+    CreateTradeInput,
+    ImportTradesInput,
+    Trade,
+    UpdateTradeInput,
+} from "@/types/models";
 import { api } from "./client";
 
 export async function listTrades(): Promise<Trade[]> {
@@ -22,4 +27,10 @@ export async function updateTrade(id: number, input: UpdateTradeInput): Promise<
 
 export async function deleteTrade(id: number): Promise<void> {
     await api.delete(`/trade/${id}`);
+}
+
+/** Bulk-adds trades under one market and returns how many were imported. */
+export async function importTrades(input: ImportTradesInput): Promise<number> {
+    const response = await api.post<{ imported: number }>("/trade/import", input);
+    return response.data.imported;
 }

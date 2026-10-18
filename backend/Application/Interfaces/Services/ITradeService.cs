@@ -10,4 +10,10 @@ public interface ITradeService
     Task<TradeDto> AddAsync(int userId, CreateTradeRequest request);
     Task UpdateAsync(int userId, int id, UpdateTradeRequest request);
     Task DeleteAsync(int userId, int id);
+
+    /// <summary>
+    /// Adds many trades to one market in a single batch. Returns how many were
+    /// imported.
+    /// </summary>
+    Task<int> ImportAsync(int userId, ImportTradesRequest request);
 }

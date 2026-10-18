@@ -47,7 +47,7 @@ export interface Trade {
     quantity: number;
     entryTime: string;
     exitTime: string;
-    /** Flat commission charged per unit. */
+    /** Flat commission charged per unit for the full round trip (per side × 2). */
     commissionPerUnit: number;
     /** Total commission, derived by the server as `commissionPerUnit × quantity`. */
     commission: number;
@@ -74,8 +74,27 @@ export interface CreateTradeInput {
     exitTime: string;
     /** The market the trade belongs to; its currency is inherited by the trade. */
     marketId: number;
-    /** Flat commission charged per unit; the server derives the total. */
+    /** Round-trip commission charged per unit (client sends per side × 2); the server derives the total. */
     commissionPerUnit: number;
 }
 
 export type UpdateTradeInput = Partial<CreateTradeInput>;
+
+/** A single trade parsed from an external export, in the shape the import API expects. */
+export interface ImportTradeItem {
+    instrument: string;
+    direction: Direction;
+    quantity: number;
+    entryPrice: number;
+    exitPrice: number;
+    entryTime: string;
+    exitTime: string;
+    /** Commission charged per side; the server doubles it for the round trip. */
+    commissionPerSide: number;
+}
+
+export interface ImportTradesInput {
+    /** Every imported trade is filed under this market. */
+    marketId: number;
+    trades: ImportTradeItem[];
+}

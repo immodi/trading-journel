@@ -4,6 +4,7 @@ using Application.Interfaces.Services;
 using Application.Mappers;
 using Application.Requests.Trade;
 using Domain.Entities;
+using Domain.Enum;
 
 namespace Infrastructure.Services;
 
@@ -63,6 +64,33 @@ public class TradeService(
         await repository.SaveChangesAsync();
     }
 
+    public async Task<int> ImportAsync(int userId, ImportTradesRequest request)
+    {
+        // Validating the market up front guarantees every trade in the batch is
+        // filed under a market the caller owns before anything is written.
+        var market = await ResolveMarketAsync(userId, request.MarketId);
+
+        if (request.Trades.Count == 0)
+            return 0;
+
+        if (request.Trades.Count > MaxImportSize)
+            throw new ArgumentException(
+                $"A single import can contain at most {MaxImportSize} trades.");
+
+        var trades = new List<Trade>(request.Trades.Count);
+
+        foreach (var item in request.Trades)
+        {
+            ValidateImportItem(item);
+            trades.Add(item.ToEntity(userId, market));
+        }
+
+        await repository.AddRangeAsync(trades);
+        await repository.SaveChangesAsync();
+
+        return trades.Count;
+    }
+
     /// <summary>
     /// Loads a trade and guarantees it belongs to the requesting user. A trade
     /// owned by somebody else is reported as not found so the API never leaks
@@ -96,4 +124,28 @@ public class TradeService(
         if (commissionPerUnit < 0)
             throw new ArgumentException("Commission per unit must be a non-negative number.");
     }
+
+    private static void ValidateImportItem(ImportTradeItem item)
+    {
+        if (string.IsNullOrWhiteSpace(item.Instrument))
+            throw new ArgumentException("Instrument is required.");
+
+        if (item.Direction is not (Direction.Long or Direction.Short))
+            throw new ArgumentException("Direction must be Long or Short.");
+
+        if (item.Quantity <= 0)
+            throw new ArgumentException("Quantity must be a whole number greater than zero.");
+
+        if (item.EntryPrice < 0 || item.ExitPrice < 0)
+            throw new ArgumentException("Prices must be non-negative numbers.");
+
+        if (item.ExitTime < item.EntryTime)
+            throw new ArgumentException("Exit time cannot be before the entry time.");
+
+        if (item.CommissionPerSide < 0)
+            throw new ArgumentException("Commission per side must be a non-negative number.");
+    }
+
+    /// <summary>Upper bound on a single import to keep request payloads sane.</summary>
+    private const int MaxImportSize = 5000;
 }

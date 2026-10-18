@@ -10,6 +10,12 @@ public interface ITradeRepository : IRepository<Trade>
     Task<IEnumerable<Trade>> GetByUserIdAsync(int userId);
 
     /// <summary>
+    /// Stages several trades for insertion in one batch. Changes are persisted
+    /// by the caller via <see cref="IRepository{T}.SaveChangesAsync"/>.
+    /// </summary>
+    Task AddRangeAsync(IEnumerable<Trade> trades);
+
+    /// <summary>
     /// Returns a single trade with its market loaded, or <c>null</c> when it
     /// does not exist.
     /// </summary>

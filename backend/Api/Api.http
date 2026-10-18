@@ -72,6 +72,27 @@ Content-Type: application/json
   "commissionPerUnit": 1.82
 }
 
+### Import trades into a market
+POST {{Api_HostAddress}}/api/trade/import
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "marketId": 1,
+  "trades": [
+    {
+      "instrument": "MNQ",
+      "direction": 0,
+      "quantity": 1,
+      "entryPrice": 14824.98,
+      "exitPrice": 14844.98,
+      "entryTime": "2021-07-11T22:00:00Z",
+      "exitTime": "2021-07-11T22:05:00Z",
+      "commissionPerSide": 1
+    }
+  ]
+}
+
 ### Delete a trade
 DELETE {{Api_HostAddress}}/api/trade/1
 Authorization: Bearer {{token}}

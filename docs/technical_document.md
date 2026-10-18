@@ -54,7 +54,7 @@ The objective is to build a modern, maintainable full-stack web application usin
 | TypeScript | Type safety |
 | Vite | Development server & build tool |
 | React Router 7 | Client-side routing |
-| TanStack Query 5 | Server state & caching |
+| TanStack Query 5 | Server state management |
 | Tailwind CSS v4 + Base UI | Styling & accessible primitives |
 | axios | HTTP client |
 | lucide-react | Icons |
@@ -71,7 +71,7 @@ These appear in the design's history but are intentionally out of scope for the
 current release:
 
 * **SQL Server / a server database** — SQLite keeps deployment to a single file.
-* **Serilog** — the built-in logger is sufficient at this scale.
+* **Serilog** — the built-in logger is sufficient for a single-user app.
 * **FluentValidation** — create requests rely on required members and update requests are partial; business rules live in services (see [§8](#8-validation--error-handling)).
 * **Docker** — a single self-contained binary is simpler to ship self-hosted.
 
@@ -143,7 +143,7 @@ Api             controllers, exception handling, (depends on Infrastructure)
 src/
 ├── api/         axios clients (client, auth, markets, trades)
 ├── hooks/       context + server state (useAuth, useTheme, useMarkets, useTrades)
-├── lib/         pure helpers (analytics, format, datetime)
+├── lib/         pure helpers (analytics, format, datetime, trade import)
 ├── components/  layout, dashboard, markets, trades, theme, ui primitives
 ├── pages/       route screens (Auth, Dashboard, Markets, Trades, NotFound)
 ├── router/      route table
@@ -200,13 +200,14 @@ names are singular (`/api/trade`, not `/api/trades`).
 | `GET` | `/api/trade` | Yes | List the caller's trades. |
 | `GET` | `/api/trade/{id}` | Yes | Get one of the caller's trades. |
 | `POST` | `/api/trade` | Yes | Create a trade. |
+| `POST` | `/api/trade/import` | Yes | Bulk-import trades into one of the caller's markets. |
 | `PUT` | `/api/trade/{id}` | Yes | Update a trade. |
 | `DELETE` | `/api/trade/{id}` | Yes | Delete a trade. |
 | `GET/POST/PUT/DELETE` | `/api/user[...]` | Yes | User administration (see the note below). |
 
 > **Note.** The `UserController` offers list/get/create/update/delete over users
-> and is reachable by any authenticated user today. Restricting it to an admin
-> role is a [Planned] item (see the roadmap).
+> and is reachable by any authenticated user. The app is distributed per user
+> (single-user instances), so no admin role is planned.
 
 ## Conventions
 
@@ -251,8 +252,6 @@ At startup the key is resolved up front so misconfiguration fails fast:
 * If it is empty, a 48-byte key is generated and persisted to `jwt-secret.key`
   next to the binary, then reused on later starts (keeps issued tokens valid
   across restarts). Set `JwtSettings__Secret` to supply your own.
-
-> **[Planned]** Refresh tokens and role-based access control.
 
 ---
 
@@ -308,8 +307,8 @@ See the rendered [entity diagram](./entity_diagram.png) and its
 * **EF Core** maps the entities through `IEntityTypeConfiguration` classes
   (`UserConfiguration`, `MarketConfiguration`, `TradeConfiguration`).
 * **SQLite** is the database (`ConnectionStrings:Default` = `Data Source=db.db`).
-  The file is created on first run; the EF provider is swappable for SQL Server
-  or PostgreSQL.
+  The file is created on first run. SQLite is intentional for the single-user,
+  self-hosted distribution model.
 * **Unique indexes** enforce unique `Username` and `Email`, plus a unique
   `(UserId, Name)` index on `Markets`.
 * **Precision** on monetary columns is `(18,4)`; `Quantity` is an `int`.
@@ -337,11 +336,14 @@ pnl = direction == Long
 ProfitLoss = pnl - Commission
 ```
 
-The client supplies a **per-unit** commission (`CommissionPerUnit`) on create or
-edit; the server is the source of truth and always derives the stored total:
+The client supplies a **per-side** commission on create, edit, or import; the
+server is the source of truth and always derives the stored total. A round trip
+is charged on both the entry and the exit, so the stored per-unit rate is the
+per-side rate doubled:
 
 ```text
-Commission = CommissionPerUnit × Quantity
+CommissionPerUnit = CommissionPerSide × 2
+Commission        = CommissionPerUnit × Quantity
 ```
 
 There is no hard-coded default rate. The frontend only previews the total.
@@ -361,8 +363,12 @@ Validation is intentionally lightweight:
 * **Business rules** are enforced in the service layer, e.g. duplicate
   username/email on registration and duplicate market names (→ `409`), access to
   a trade or market the user does not own (→ `404`), a market name/currency that
-  fails validation or a negative commission per unit (→ `400`), and deleting a
+  fails validation or a negative commission per side (→ `400`), and deleting a
   market that still has trades (→ `409`).
+* **Import** requests are validated per row (non-empty instrument, Long/Short
+  direction, positive quantity, non-negative prices and commission, ordered
+  timestamps) after the target market's ownership is checked, and before any
+  trade is written; a malformed batch never leaves a partial import behind.
 
 > **[Planned]** FluentValidation for richer, declarative request rules.
 
@@ -423,7 +429,7 @@ the protected routes.
 
 ## State
 
-* **TanStack Query** caches server state; `useTrades` owns the trade query and
+* **TanStack Query** manages server state; `useTrades` owns the trade query and
   its mutations, and invalidates on write.
 * **AuthProvider / useAuth** hold the session (token presence + current profile)
   and expose register/login/logout.
@@ -453,8 +459,8 @@ switches between an **All markets** view and a single market's panel. The All
 markets view shows only currency-independent metrics from
 `calculateOverallStats` (total trades, win rate, market/currency counts); a
 selected market shows its net P/L, averages, commission, and equity curve in its
-own currency. The selector updates the cards and curve without a page reload and
-scales to any number of markets. The application performs no currency
+own currency. The selector updates the cards and curve without a page reload.
+The application performs no currency
 conversion. `vitest` unit tests in `lib/analytics.test.ts` assert that
 cross-currency trades never contribute to the same monetary total or curve.
 
@@ -532,9 +538,9 @@ the app self-extracts on launch.
 
 ## Backend tests
 
-`Infrastructure.Tests` holds **60 xUnit tests** covering:
+`Infrastructure.Tests` holds **70 xUnit tests** covering:
 
-* `TradeService` — CRUD, per-user scoping, P/L and commission rules
+* `TradeService` — CRUD, per-user scoping, batch import, P/L and commission rules
 * `MarketService` — CRUD, per-user scoping, duplicate names, safe deletion
 * `TradeRepository` — persistence, lookups, and market associations
 * `MarketRepository` — persistence and per-user queries
@@ -563,19 +569,15 @@ request:
 
 ---
 
-# 13. Performance Considerations
+# 13. Efficiency
 
 * All database access is asynchronous.
 * Profit/loss is computed once at write time and stored, so list/detail reads are
   simple projections.
-* Per-user queries are naturally bounded and driven by indexed keys and the
-  unique user indexes.
+* Per-user queries are driven by indexed keys and the unique user indexes.
 * The SPA is served as static files; the API serves JSON only.
 * Analytics run on the client over the fetched list, which is ideal for a
   personal journal.
-
-> **[Planned]** For very large histories: a server-side statistics/aggregation
-> endpoint and pagination of the trade list.
 
 ---
 
@@ -597,11 +599,6 @@ development practices while remaining approachable for future expansion.
 
 # 15. Future Technical Enhancements
 
-* Server-side statistics endpoint with pagination/aggregation
-* CSV import pipeline with duplicate detection and per-broker parsers
+* Import duplicate detection and support for additional export formats
 * Trade notes, screenshots, and tags (file storage via an abstraction with an
   object-storage backend)
-* Refresh tokens and role-based access control for the user-admin endpoints
-* Swap SQLite for a server database in production
-* Caching (e.g. Redis), background jobs, full-text search, and containerized
-  deployment

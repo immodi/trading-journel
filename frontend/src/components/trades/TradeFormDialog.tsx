@@ -42,7 +42,7 @@ interface FormState {
     exitPrice: string;
     entryTime: string;
     exitTime: string;
-    commissionPerUnit: string;
+    commissionPerSide: string;
 }
 
 const DIRECTION_ITEMS = {
@@ -50,7 +50,18 @@ const DIRECTION_ITEMS = {
     [Direction.Short]: DIRECTION_LABELS[Direction.Short],
 };
 
-const DEFAULT_COMMISSION_PER_UNIT = "0";
+const DEFAULT_COMMISSION_PER_SIDE = "0";
+
+/**
+ * A round trip pays commission on both the entry and the exit, so the total is
+ * `per side × 2 × quantity`.
+ */
+const COMMISSION_SIDES = 2;
+
+/** Round to 4 decimals to match the server's decimal(18,4) storage. */
+function round4(value: number): number {
+    return Math.round(value * 10000) / 10000;
+}
 
 function initialForm(trade?: Trade | null): FormState {
     if (!trade) {
@@ -63,7 +74,7 @@ function initialForm(trade?: Trade | null): FormState {
             exitPrice: "",
             entryTime: nowAsDateTimeLocal(),
             exitTime: nowAsDateTimeLocal(),
-            commissionPerUnit: DEFAULT_COMMISSION_PER_UNIT,
+            commissionPerSide: DEFAULT_COMMISSION_PER_SIDE,
         };
     }
 
@@ -76,7 +87,7 @@ function initialForm(trade?: Trade | null): FormState {
         exitPrice: String(trade.exitPrice),
         entryTime: toDateTimeLocal(trade.entryTime),
         exitTime: toDateTimeLocal(trade.exitTime),
-        commissionPerUnit: String(trade.commissionPerUnit),
+        commissionPerSide: String(round4(trade.commissionPerUnit / COMMISSION_SIDES)),
     };
 }
 
@@ -115,10 +126,12 @@ export function TradeFormDialog({ open, onOpenChange, trade }: TradeFormDialogPr
     );
 
     const quantity = Number(form.quantity);
-    const commissionPerUnit = Number(form.commissionPerUnit);
+    const commissionPerSide = Number(form.commissionPerSide);
     const totalCommission =
-        Number.isFinite(quantity) && Number.isFinite(commissionPerUnit) && quantity > 0
-            ? quantity * commissionPerUnit
+        Number.isFinite(quantity) &&
+        quantity > 0 &&
+        Number.isFinite(commissionPerSide)
+            ? round4(commissionPerSide * COMMISSION_SIDES * quantity)
             : 0;
 
     async function handleSubmit(event: FormEvent) {
@@ -128,7 +141,8 @@ export function TradeFormDialog({ open, onOpenChange, trade }: TradeFormDialogPr
         const entryPrice = Number(form.entryPrice);
         const exitPrice = Number(form.exitPrice);
         const marketId = Number(effectiveMarketId);
-        const perUnit = form.commissionPerUnit.trim() === "" ? 0 : Number(form.commissionPerUnit);
+        const perSide =
+            form.commissionPerSide.trim() === "" ? 0 : Number(form.commissionPerSide);
 
         if (!effectiveMarketId || !Number.isInteger(marketId)) {
             setError("Select a market for this trade.");
@@ -150,8 +164,8 @@ export function TradeFormDialog({ open, onOpenChange, trade }: TradeFormDialogPr
             setError("Exit price must be a non-negative number.");
             return;
         }
-        if (!Number.isFinite(perUnit) || perUnit < 0) {
-            setError("Commission per unit must be a non-negative number.");
+        if (!Number.isFinite(perSide) || perSide < 0) {
+            setError("Commission per side must be a non-negative number.");
             return;
         }
         if (!form.entryTime || !form.exitTime) {
@@ -172,7 +186,7 @@ export function TradeFormDialog({ open, onOpenChange, trade }: TradeFormDialogPr
             exitPrice,
             entryTime: fromDateTimeLocal(form.entryTime),
             exitTime: fromDateTimeLocal(form.exitTime),
-            commissionPerUnit: perUnit,
+            commissionPerUnit: round4(perSide * COMMISSION_SIDES),
         };
 
         try {
@@ -210,7 +224,7 @@ export function TradeFormDialog({ open, onOpenChange, trade }: TradeFormDialogPr
                         </Alert>
                     )}
 
-                    <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="grid items-start gap-4 sm:grid-cols-2">
                         <div className="grid gap-2">
                             <Label htmlFor="market">Market</Label>
                             <Select
@@ -305,25 +319,6 @@ export function TradeFormDialog({ open, onOpenChange, trade }: TradeFormDialogPr
                         </div>
 
                         <div className="grid gap-2">
-                            <Label htmlFor="commissionPerUnit">Commission per unit</Label>
-                            <Input
-                                id="commissionPerUnit"
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                placeholder="0.00"
-                                value={form.commissionPerUnit}
-                                onChange={(event) =>
-                                    update("commissionPerUnit", event.target.value)
-                                }
-                            />
-                            <p className="text-xs text-muted-foreground">
-                                Total {formatCurrency(totalCommission, selectedMarket?.currency)} —
-                                calculated by the server as per unit × quantity.
-                            </p>
-                        </div>
-
-                        <div className="grid gap-2">
                             <Label htmlFor="entryTime">Entry time</Label>
                             <Input
                                 id="entryTime"
@@ -341,6 +336,25 @@ export function TradeFormDialog({ open, onOpenChange, trade }: TradeFormDialogPr
                                 value={form.exitTime}
                                 onChange={(event) => update("exitTime", event.target.value)}
                             />
+                        </div>
+
+                        <div className="grid gap-2 sm:col-span-2">
+                            <Label htmlFor="commissionPerSide">Commission per side</Label>
+                            <Input
+                                id="commissionPerSide"
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                placeholder="0.00"
+                                value={form.commissionPerSide}
+                                onChange={(event) =>
+                                    update("commissionPerSide", event.target.value)
+                                }
+                            />
+                            <p className="text-xs text-muted-foreground">
+                                Total {formatCurrency(totalCommission, selectedMarket?.currency)} —
+                                calculated by the server as per side × 2 × quantity.
+                            </p>
                         </div>
                     </div>
 

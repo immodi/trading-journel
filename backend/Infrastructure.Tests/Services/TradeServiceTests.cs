@@ -270,6 +270,215 @@ public class TradeServiceTests
         await act.Should().ThrowAsync<ArgumentException>();
     }
 
+    private static ImportTradeItem CreateImportItem(
+        string instrument = "MNQ",
+        Direction direction = Direction.Long,
+        int quantity = 1,
+        decimal entryPrice = 100,
+        decimal exitPrice = 110,
+        DateTime? entryTime = null,
+        DateTime? exitTime = null,
+        decimal commissionPerSide = 1m)
+    {
+        var entered = entryTime ?? DateTime.UtcNow;
+
+        return new ImportTradeItem
+        {
+            Instrument = instrument,
+            Direction = direction,
+            Quantity = quantity,
+            EntryPrice = entryPrice,
+            ExitPrice = exitPrice,
+            EntryTime = entered,
+            ExitTime = exitTime ?? entered,
+            CommissionPerSide = commissionPerSide,
+        };
+    }
+
+    private static ImportTradesRequest CreateImportRequest(
+        decimal commissionPerSide = 1m,
+        int quantity = 1,
+        int marketId = MarketId,
+        int tradeCount = 1)
+    {
+        var trades = Enumerable.Range(0, tradeCount)
+            .Select(_ => CreateImportItem(
+                quantity: quantity,
+                commissionPerSide: commissionPerSide))
+            .ToList();
+
+        return new ImportTradesRequest { MarketId = marketId, Trades = trades };
+    }
+
+    private static ImportTradesRequest CreateSingleImportRequest(ImportTradeItem item) =>
+        new() { MarketId = MarketId, Trades = new[] { item } };
+
+    [Fact]
+    public async Task ImportAsync_Should_Add_Every_Trade_Under_The_Selected_Market()
+    {
+        // Arrange
+        var request = CreateImportRequest(tradeCount: 3);
+
+        // Act
+        var imported = await _service.ImportAsync(UserId, request);
+
+        // Assert
+        imported.Should().Be(3);
+
+        _repositoryMock.Verify(
+            r => r.AddRangeAsync(It.Is<IEnumerable<Trade>>(trades =>
+                trades.Count() == 3 &&
+                trades.All(t => t.UserId == UserId && t.MarketId == MarketId))),
+            Times.Once);
+
+        _repositoryMock.Verify(r => r.SaveChangesAsync(), Times.Once);
+    }
+
+    [Fact]
+    public async Task ImportAsync_Should_Double_The_Per_Side_Commission_For_The_Round_Trip()
+    {
+        // Arrange
+        List<Trade>? imported = null;
+        _repositoryMock
+            .Setup(r => r.AddRangeAsync(It.IsAny<IEnumerable<Trade>>()))
+            .Callback<IEnumerable<Trade>>(trades => imported = trades.ToList());
+
+        // Commission per side of 1 on a quantity of 2 => 1 * 2 * 2 = 4.
+        var request = CreateImportRequest(commissionPerSide: 1m, quantity: 2);
+
+        // Act
+        await _service.ImportAsync(UserId, request);
+
+        // Assert
+        imported.Should().NotBeNull();
+        var trade = imported!.Single();
+        trade.CommissionPerUnit.Should().Be(2m);
+        trade.Commission.Should().Be(4m);
+        // (110 - 100) * 2 - 4
+        trade.ProfitLoss.Should().Be(16m);
+    }
+
+    [Fact]
+    public async Task ImportAsync_Should_Return_Zero_For_An_Empty_Batch()
+    {
+        // Arrange
+        var request = CreateImportRequest(tradeCount: 0);
+
+        // Act
+        var imported = await _service.ImportAsync(UserId, request);
+
+        // Assert
+        imported.Should().Be(0);
+
+        _repositoryMock.Verify(
+            r => r.AddRangeAsync(It.IsAny<IEnumerable<Trade>>()), Times.Never);
+        _repositoryMock.Verify(r => r.SaveChangesAsync(), Times.Never);
+    }
+
+    [Fact]
+    public async Task ImportAsync_Should_Throw_When_Market_Does_Not_Belong_To_The_User()
+    {
+        // Arrange
+        const int foreignMarketId = 55;
+        _marketRepositoryMock
+            .Setup(r => r.GetByIdAsync(foreignMarketId))
+            .ReturnsAsync(new Market { Id = foreignMarketId, UserId = UserId + 1 });
+
+        var request = CreateImportRequest(marketId: foreignMarketId);
+
+        // Act
+        var act = () => _service.ImportAsync(UserId, request);
+
+        // Assert
+        await act.Should().ThrowAsync<KeyNotFoundException>();
+
+        _repositoryMock.Verify(
+            r => r.AddRangeAsync(It.IsAny<IEnumerable<Trade>>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ImportAsync_Should_Throw_When_Commission_Per_Side_Is_Negative()
+    {
+        // Arrange
+        var request = CreateImportRequest(commissionPerSide: -1m);
+
+        // Act
+        var act = () => _service.ImportAsync(UserId, request);
+
+        // Assert
+        await act.Should().ThrowAsync<ArgumentException>();
+
+        _repositoryMock.Verify(
+            r => r.AddRangeAsync(It.IsAny<IEnumerable<Trade>>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ImportAsync_Should_Throw_When_Quantity_Is_Not_Positive()
+    {
+        // Arrange
+        var request = CreateSingleImportRequest(CreateImportItem(quantity: 0));
+
+        // Act
+        var act = () => _service.ImportAsync(UserId, request);
+
+        // Assert
+        await act.Should().ThrowAsync<ArgumentException>();
+
+        _repositoryMock.Verify(
+            r => r.AddRangeAsync(It.IsAny<IEnumerable<Trade>>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ImportAsync_Should_Throw_When_Exit_Is_Before_Entry()
+    {
+        // Arrange
+        var entry = DateTime.UtcNow;
+        var request = CreateSingleImportRequest(
+            CreateImportItem(entryTime: entry, exitTime: entry.AddMinutes(-1)));
+
+        // Act
+        var act = () => _service.ImportAsync(UserId, request);
+
+        // Assert
+        await act.Should().ThrowAsync<ArgumentException>();
+
+        _repositoryMock.Verify(
+            r => r.AddRangeAsync(It.IsAny<IEnumerable<Trade>>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ImportAsync_Should_Throw_When_Direction_Is_Not_Tradable()
+    {
+        // Arrange
+        var request = CreateSingleImportRequest(
+            CreateImportItem(direction: Direction.Sideways));
+
+        // Act
+        var act = () => _service.ImportAsync(UserId, request);
+
+        // Assert
+        await act.Should().ThrowAsync<ArgumentException>();
+
+        _repositoryMock.Verify(
+            r => r.AddRangeAsync(It.IsAny<IEnumerable<Trade>>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ImportAsync_Should_Throw_When_A_Price_Is_Negative()
+    {
+        // Arrange
+        var request = CreateSingleImportRequest(CreateImportItem(entryPrice: -1));
+
+        // Act
+        var act = () => _service.ImportAsync(UserId, request);
+
+        // Assert
+        await act.Should().ThrowAsync<ArgumentException>();
+
+        _repositoryMock.Verify(
+            r => r.AddRangeAsync(It.IsAny<IEnumerable<Trade>>()), Times.Never);
+    }
+
     [Fact]
     public async Task UpdateAsync_Should_Update_Trade()
     {

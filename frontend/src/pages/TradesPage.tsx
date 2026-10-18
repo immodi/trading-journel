@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Upload } from "lucide-react";
 import type { Trade } from "@/types/models";
 import { useTrades } from "@/hooks/useTrades";
 import { getErrorMessage } from "@/api/client";
@@ -15,6 +15,7 @@ import {
 import { TradeFilters } from "@/components/trades/TradeFilters";
 import { TradesTable } from "@/components/trades/TradesTable";
 import { TradeFormDialog } from "@/components/trades/TradeFormDialog";
+import { ImportTradesDialog } from "@/components/trades/ImportTradesDialog";
 import { DeleteTradeDialog } from "@/components/trades/DeleteTradeDialog";
 
 function localDate(iso: string): string {
@@ -29,6 +30,7 @@ export default function TradesPage() {
 
     const [filters, setFilters] = useState<TradeFiltersState>(EMPTY_FILTERS);
     const [formOpen, setFormOpen] = useState(false);
+    const [importOpen, setImportOpen] = useState(false);
     const [editing, setEditing] = useState<Trade | null>(null);
     const [deleting, setDeleting] = useState<Trade | null>(null);
 
@@ -67,10 +69,16 @@ export default function TradesPage() {
                 title="Trades"
                 description="Every trade you have logged, with its result and duration."
                 action={
-                    <Button onClick={openCreate}>
-                        <Plus />
-                        Add trade
-                    </Button>
+                    <div className="flex gap-2">
+                        <Button variant="outline" onClick={() => setImportOpen(true)}>
+                            <Upload />
+                            Import
+                        </Button>
+                        <Button onClick={openCreate}>
+                            <Plus />
+                            Add trade
+                        </Button>
+                    </div>
                 }
             />
 
@@ -141,6 +149,15 @@ export default function TradesPage() {
                         }
                     }}
                     trade={editing}
+                />
+            )}
+
+            {importOpen && (
+                <ImportTradesDialog
+                    open
+                    onOpenChange={(open) => {
+                        if (!open) setImportOpen(false);
+                    }}
                 />
             )}
 

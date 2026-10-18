@@ -67,7 +67,9 @@ legend right
   Currency is a 3-letter ISO 4217 code.
   A trade always belongs to a market and
   inherits its currency.
-  CommissionPerUnit is user supplied.
+  CommissionPerSide is user supplied on create,
+  edit, and import (per side of the round trip).
+  CommissionPerUnit = CommissionPerSide x 2
   Commission = CommissionPerUnit x Quantity
   ProfitLoss = (Exit - Entry) x Quantity - Commission
   (Entry - Exit for Short).

@@ -56,6 +56,25 @@ public static class TradeMapper
                 commission)
         };
     }
+
+    /// <summary>
+    /// Builds a trade from an imported export row. Imported rows carry a
+    /// per-side commission, so the stored per-unit rate is doubled before the
+    /// normal create mapping runs.
+    /// </summary>
+    public static Trade ToEntity(this ImportTradeItem request, int userId, Market market) =>
+        new CreateTradeRequest
+        {
+            Instrument = request.Instrument,
+            Direction = request.Direction,
+            EntryPrice = request.EntryPrice,
+            ExitPrice = request.ExitPrice,
+            Quantity = request.Quantity,
+            EntryTime = request.EntryTime,
+            ExitTime = request.ExitTime,
+            MarketId = market.Id,
+            CommissionPerUnit = request.CommissionPerSide * CommissionSidesPerRoundTrip,
+        }.ToEntity(userId, market);
     
     public static void UpdateTrade(this UpdateTradeRequest request, Trade trade)
     {
@@ -99,6 +118,12 @@ public static class TradeMapper
 
         trade.UpdatedAt = DateTime.UtcNow;
     }
+
+    /// <summary>
+    /// A round trip pays commission on both the entry and the exit, so a
+    /// per-side rate is doubled to get the per-unit rate the server stores.
+    /// </summary>
+    private const int CommissionSidesPerRoundTrip = 2;
 
     /// <summary>
     /// Total commission for a trade. The server derives this from the user

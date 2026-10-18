@@ -2,11 +2,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
     createTrade,
     deleteTrade,
+    importTrades,
     listTrades,
     updateTrade,
 } from "@/api/trades";
 import { marketKeys } from "@/hooks/useMarkets";
-import type { CreateTradeInput, UpdateTradeInput } from "@/types/models";
+import type { CreateTradeInput, ImportTradesInput, UpdateTradeInput } from "@/types/models";
 
 export const tradeKeys = {
     all: ["trades"] as const,
@@ -53,6 +54,19 @@ export function useDeleteTrade() {
         mutationFn: (id: number) => deleteTrade(id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: tradeKeys.all });
+            queryClient.invalidateQueries({ queryKey: marketKeys.all });
+        },
+    });
+}
+
+export function useImportTrades() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (input: ImportTradesInput) => importTrades(input),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: tradeKeys.all });
+            // Trade counts shown on the markets page change with the journal.
             queryClient.invalidateQueries({ queryKey: marketKeys.all });
         },
     });

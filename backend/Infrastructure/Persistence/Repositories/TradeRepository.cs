@@ -18,6 +18,9 @@ public class TradeRepository(AppDbContext context) : Repository<Trade>(context),
             .Include(t => t.Market)
             .FirstOrDefaultAsync(t => t.Id == id);
 
+    public async Task AddRangeAsync(IEnumerable<Trade> trades) =>
+        await Context.Trades.AddRangeAsync(trades);
+
     public async Task<bool> AnyForMarketAsync(int marketId) =>
         await Context.Trades.AnyAsync(t => t.MarketId == marketId);
 }
