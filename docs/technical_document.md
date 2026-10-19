@@ -317,7 +317,8 @@ See the rendered [entity diagram](./entity_diagram.png) and its
 * **Migrations** are applied automatically at startup (`Database.Migrate()`).
   `AddMarketsAndCommissionPerUnit` adds the `Markets` table and the
   `MarketId`/`CommissionPerUnit` columns, attaching any pre-existing trades to a
-  per-user "Imported" market so no history is lost.
+  per-user "Imported" market so no history is lost. `AddPointValue` adds the
+  `PointValue` column, defaulting existing trades to 1.
 * **Delete behaviour** — deleting a user cascades to their markets and trades;
   deleting a market that still has trades is refused (`409 Conflict`) rather
   than silently discarding trade history (enforced in the service and by a
@@ -330,16 +331,16 @@ sees the same value and reads stay cheap:
 
 ```text
 pnl = direction == Long
-        ? (ExitPrice - EntryPrice) * Quantity
-        : (EntryPrice - ExitPrice) * Quantity
+        ? (ExitPrice - EntryPrice) * Quantity * PointValue
+        : (EntryPrice - ExitPrice) * Quantity * PointValue
 
 ProfitLoss = pnl - Commission
 ```
 
-The client supplies a **per-side** commission on create, edit, or import; the
-server is the source of truth and always derives the stored total. A round trip
-is charged on both the entry and the exit, so the stored per-unit rate is the
-per-side rate doubled:
+The client supplies a **point value** and a **per-side** commission on create,
+edit, or import; the server is the source of truth and always derives the stored
+total. A round trip is charged on both the entry and the exit, so the stored
+per-unit rate is the per-side rate doubled:
 
 ```text
 CommissionPerUnit = CommissionPerSide × 2

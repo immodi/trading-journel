@@ -12,6 +12,9 @@ public class UpdateTradeRequest
     public decimal? ExitPrice { get; init; }
     public int? Quantity { get; init; }
 
+    /// <summary>Value of one price point per unit; must be greater than zero.</summary>
+    public decimal? PointValue { get; init; }
+
     public DateTime? EntryTime { get; init; }
     public DateTime? ExitTime { get; init; }
 

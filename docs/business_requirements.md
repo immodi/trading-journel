@@ -162,6 +162,7 @@ Each trade shall support the following information:
 | Instrument | Entered | Free text, max 20 characters |
 | Direction | Entered | Long or Short (the enum also reserves Sideways) |
 | Quantity | Entered | Whole number of units |
+| Point value | Entered | Value of one price point per unit (for example 2 for MNQ, 1 for shares) |
 | Entry price | Entered | Decimal |
 | Exit price | Entered | Decimal |
 | Entry date and time | Entered | Stored in UTC |
@@ -177,8 +178,8 @@ Rules:
 * A trade always belongs to exactly one user and exactly one market.
 * A trade inherits its currency from its market.
 * Profit/loss shall be computed by the server as
-  `(exit − entry) × quantity − commission` for a Long trade, inverted for a
-  Short trade. The client never supplies profit/loss.
+  `(exit − entry) × quantity × pointValue − commission` for a Long trade,
+  inverted for a Short trade. The client never supplies profit/loss.
 * The client supplies a **per-side commission**; the server derives the total
   commission as `CommissionPerSide × 2 × Quantity` (a round trip is charged on
   both the entry and the exit). There is no hard-coded default.
@@ -201,8 +202,10 @@ Rules:
 
 * Every imported trade is filed under the selected market and inherits its
   currency; the market must belong to the requesting user.
-* The export supplies a **per-side commission**; the server derives each total
-  commission and profit/loss exactly as it does for manual entry.
+* The export's `meta` supplies a **point value** and a **per-side commission**
+  that apply to every row; the server derives each total commission and
+  profit/loss exactly as it does for manual entry. Individual trades no longer
+  carry their own commission.
 * A file that is not valid JSON, is missing its `trades` array, or contains an
   invalid row (unknown direction, non-whole quantity, negative price or
   commission, unparseable or reversed times) shall be rejected with a clear

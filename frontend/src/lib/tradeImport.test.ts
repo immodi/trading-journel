@@ -28,7 +28,6 @@ const sampleExport = {
             exitTime: "2021-07-11T22:00:00.000Z",
             entryTimeUnix: 1626040800,
             exitTimeUnix: 1626040800,
-            commissionPerSide: 1,
             totalCommission: 2,
             grossProfitLoss: 40,
             netProfitLoss: 38,
@@ -41,6 +40,8 @@ describe("parseTradeExport", () => {
         const preview = parseTradeExport(sampleExport);
 
         expect(preview.instrument).toBe("MNQ");
+        expect(preview.pointValue).toBe(2);
+        expect(preview.commissionPerSide).toBe(1);
         expect(preview.trades).toHaveLength(1);
 
         expect(preview.trades[0]).toEqual({
@@ -51,7 +52,6 @@ describe("parseTradeExport", () => {
             exitPrice: 14844.98,
             entryTime: "2021-07-11T22:00:00.000Z",
             exitTime: "2021-07-11T22:00:00.000Z",
-            commissionPerSide: 1,
         });
     });
 
@@ -73,9 +73,9 @@ describe("parseTradeExport", () => {
         expect(preview.trades[0].direction).toBe(Direction.Short);
     });
 
-    it("falls back to meta instrument and commission per side", () => {
+    it("falls back to meta instrument, point value, and commission per side", () => {
         const preview = parseTradeExport({
-            meta: { instrument: "mnq", commissionPerSide: 1.25 },
+            meta: { instrument: "mnq", pointValue: 2, commissionPerSide: 1.25 },
             trades: [
                 {
                     direction: "long",
@@ -89,11 +89,12 @@ describe("parseTradeExport", () => {
         });
 
         expect(preview.trades[0].instrument).toBe("MNQ");
-        expect(preview.trades[0].commissionPerSide).toBe(1.25);
+        expect(preview.pointValue).toBe(2);
+        expect(preview.commissionPerSide).toBe(1.25);
         expect(preview.trades[0].entryTime).toBe("2021-07-11T22:00:00.000Z");
     });
 
-    it("defaults commission to zero when neither the trade nor meta supplies it", () => {
+    it("defaults point value to one and commission to zero when meta omits them", () => {
         const preview = parseTradeExport({
             trades: [
                 {
@@ -108,7 +109,47 @@ describe("parseTradeExport", () => {
             ],
         });
 
-        expect(preview.trades[0].commissionPerSide).toBe(0);
+        expect(preview.pointValue).toBe(1);
+        expect(preview.commissionPerSide).toBe(0);
+    });
+
+    it("ignores any commission stored on an individual trade", () => {
+        const preview = parseTradeExport({
+            meta: { commissionPerSide: 1.25 },
+            trades: [
+                {
+                    instrument: "MNQ",
+                    direction: "long",
+                    quantity: 1,
+                    entryPrice: 1,
+                    exitPrice: 2,
+                    entryTime: "2026-01-01T00:00:00.000Z",
+                    exitTime: "2026-01-01T01:00:00.000Z",
+                    commissionPerSide: 9.99,
+                },
+            ],
+        });
+
+        expect(preview.commissionPerSide).toBe(1.25);
+    });
+
+    it("rejects a non-positive meta point value", () => {
+        expect(() =>
+            parseTradeExport({
+                meta: { pointValue: 0 },
+                trades: [
+                    {
+                        instrument: "MNQ",
+                        direction: "long",
+                        quantity: 1,
+                        entryPrice: 1,
+                        exitPrice: 2,
+                        entryTime: "2026-01-01T00:00:00.000Z",
+                        exitTime: "2026-01-01T01:00:00.000Z",
+                    },
+                ],
+            })
+        ).toThrow(/pointValue/i);
     });
 
     it("rejects a file without a trades array", () => {

@@ -92,6 +92,10 @@ namespace Infrastructure.Migrations
                     b.Property<int>("MarketId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<decimal>("PointValue")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("TEXT");
+
                     b.Property<decimal>("ProfitLoss")
                         .HasPrecision(18, 4)
                         .HasColumnType("TEXT");

@@ -46,6 +46,7 @@ public class TradeServiceTests
         EntryPrice = 100,
         ExitPrice = 110,
         Quantity = 1,
+        PointValue = 1,
         EntryTime = DateTime.UtcNow,
         ExitTime = DateTime.UtcNow,
         CommissionPerUnit = 1,
@@ -56,13 +57,15 @@ public class TradeServiceTests
     private static CreateTradeRequest CreateRequest(
         decimal commissionPerUnit = 1m,
         int quantity = 1,
-        int marketId = MarketId) => new()
+        int marketId = MarketId,
+        decimal pointValue = 1m) => new()
     {
         Instrument = "MNQ",
         Direction = Direction.Long,
         EntryPrice = 100,
         ExitPrice = 110,
         Quantity = quantity,
+        PointValue = pointValue,
         EntryTime = DateTime.UtcNow,
         ExitTime = DateTime.UtcNow,
         MarketId = marketId,
@@ -220,6 +223,41 @@ public class TradeServiceTests
     }
 
     [Fact]
+    public async Task AddAsync_Should_Multiply_The_Price_Move_By_The_Point_Value()
+    {
+        // Arrange
+        Trade? added = null;
+        _repositoryMock
+            .Setup(r => r.AddAsync(It.IsAny<Trade>()))
+            .Callback<Trade>(trade => added = trade);
+
+        // (110 - 100) * 3 * 2 - 6
+        var request = CreateRequest(commissionPerUnit: 2m, quantity: 3, pointValue: 2m);
+
+        // Act
+        await _service.AddAsync(UserId, request);
+
+        // Assert
+        added!.PointValue.Should().Be(2m);
+        added.ProfitLoss.Should().Be(54m);
+    }
+
+    [Fact]
+    public async Task AddAsync_Should_Throw_When_Point_Value_Is_Not_Positive()
+    {
+        // Arrange
+        var request = CreateRequest(pointValue: 0m);
+
+        // Act
+        var act = () => _service.AddAsync(UserId, request);
+
+        // Assert
+        await act.Should().ThrowAsync<ArgumentException>();
+
+        _repositoryMock.Verify(r => r.AddAsync(It.IsAny<Trade>()), Times.Never);
+    }
+
+    [Fact]
     public async Task AddAsync_Should_Throw_When_Market_Does_Not_Exist()
     {
         // Arrange
@@ -277,8 +315,7 @@ public class TradeServiceTests
         decimal entryPrice = 100,
         decimal exitPrice = 110,
         DateTime? entryTime = null,
-        DateTime? exitTime = null,
-        decimal commissionPerSide = 1m)
+        DateTime? exitTime = null)
     {
         var entered = entryTime ?? DateTime.UtcNow;
 
@@ -291,7 +328,6 @@ public class TradeServiceTests
             ExitPrice = exitPrice,
             EntryTime = entered,
             ExitTime = exitTime ?? entered,
-            CommissionPerSide = commissionPerSide,
         };
     }
 
@@ -299,19 +335,33 @@ public class TradeServiceTests
         decimal commissionPerSide = 1m,
         int quantity = 1,
         int marketId = MarketId,
-        int tradeCount = 1)
+        int tradeCount = 1,
+        decimal pointValue = 1m)
     {
         var trades = Enumerable.Range(0, tradeCount)
-            .Select(_ => CreateImportItem(
-                quantity: quantity,
-                commissionPerSide: commissionPerSide))
+            .Select(_ => CreateImportItem(quantity: quantity))
             .ToList();
 
-        return new ImportTradesRequest { MarketId = marketId, Trades = trades };
+        return new ImportTradesRequest
+        {
+            MarketId = marketId,
+            PointValue = pointValue,
+            CommissionPerSide = commissionPerSide,
+            Trades = trades,
+        };
     }
 
-    private static ImportTradesRequest CreateSingleImportRequest(ImportTradeItem item) =>
-        new() { MarketId = MarketId, Trades = new[] { item } };
+    private static ImportTradesRequest CreateSingleImportRequest(
+        ImportTradeItem item,
+        decimal commissionPerSide = 1m,
+        decimal pointValue = 1m) =>
+        new()
+        {
+            MarketId = MarketId,
+            PointValue = pointValue,
+            CommissionPerSide = commissionPerSide,
+            Trades = new[] { item },
+        };
 
     [Fact]
     public async Task ImportAsync_Should_Add_Every_Trade_Under_The_Selected_Market()
@@ -356,6 +406,49 @@ public class TradeServiceTests
         trade.Commission.Should().Be(4m);
         // (110 - 100) * 2 - 4
         trade.ProfitLoss.Should().Be(16m);
+    }
+
+    [Fact]
+    public async Task ImportAsync_Should_Use_The_Meta_Point_Value_And_Commission()
+    {
+        // Arrange
+        List<Trade>? imported = null;
+        _repositoryMock
+            .Setup(r => r.AddRangeAsync(It.IsAny<IEnumerable<Trade>>()))
+            .Callback<IEnumerable<Trade>>(trades => imported = trades.ToList());
+
+        // MNQ sample: price move -20, point value 2, per-side commission 1.
+        var item = CreateImportItem(entryPrice: 14824.72m, exitPrice: 14804.72m);
+        var request = CreateSingleImportRequest(
+            item, commissionPerSide: 1m, pointValue: 2m);
+
+        // Act
+        await _service.ImportAsync(UserId, request);
+
+        // Assert
+        imported.Should().NotBeNull();
+        var trade = imported!.Single();
+        trade.PointValue.Should().Be(2m);
+        trade.CommissionPerUnit.Should().Be(2m);
+        trade.Commission.Should().Be(2m);
+        // -20 * 2 * 1 - 2
+        trade.ProfitLoss.Should().Be(-42m);
+    }
+
+    [Fact]
+    public async Task ImportAsync_Should_Throw_When_Point_Value_Is_Not_Positive()
+    {
+        // Arrange
+        var request = CreateImportRequest(pointValue: 0m);
+
+        // Act
+        var act = () => _service.ImportAsync(UserId, request);
+
+        // Assert
+        await act.Should().ThrowAsync<ArgumentException>();
+
+        _repositoryMock.Verify(
+            r => r.AddRangeAsync(It.IsAny<IEnumerable<Trade>>()), Times.Never);
     }
 
     [Fact]
@@ -511,6 +604,41 @@ public class TradeServiceTests
 
         _repositoryMock.Verify(r => r.UpdateAsync(trade), Times.Once);
         _repositoryMock.Verify(r => r.SaveChangesAsync(), Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_Should_Recompute_ProfitLoss_When_Point_Value_Changes()
+    {
+        // Arrange
+        var trade = CreateTrade();
+        trade.CommissionPerUnit = 0m;
+        trade.Commission = 0m;
+
+        _repositoryMock.Setup(r => r.GetWithMarketAsync(1)).ReturnsAsync(trade);
+
+        // Act
+        await _service.UpdateAsync(UserId, 1, new UpdateTradeRequest { PointValue = 2m });
+
+        // Assert
+        trade.PointValue.Should().Be(2m);
+        // (110 - 100) * 2
+        trade.ProfitLoss.Should().Be(20m);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_Should_Throw_When_Point_Value_Is_Not_Positive()
+    {
+        // Arrange
+        var trade = CreateTrade();
+        _repositoryMock.Setup(r => r.GetWithMarketAsync(1)).ReturnsAsync(trade);
+
+        // Act
+        var act = () => _service.UpdateAsync(UserId, 1, new UpdateTradeRequest { PointValue = 0m });
+
+        // Assert
+        await act.Should().ThrowAsync<ArgumentException>();
+
+        _repositoryMock.Verify(r => r.UpdateAsync(It.IsAny<Trade>()), Times.Never);
     }
 
     [Fact]

@@ -28,6 +28,7 @@ public class TradeService(
     {
         var market = await ResolveMarketAsync(userId, request.MarketId);
         ValidateCommissionPerUnit(request.CommissionPerUnit);
+        ValidatePointValue(request.PointValue);
 
         var trade = request.ToEntity(userId, market);
 
@@ -49,6 +50,9 @@ public class TradeService(
 
         if (request.CommissionPerUnit.HasValue)
             ValidateCommissionPerUnit(request.CommissionPerUnit.Value);
+
+        if (request.PointValue.HasValue)
+            ValidatePointValue(request.PointValue.Value);
 
         request.UpdateTrade(trade);
 
@@ -77,12 +81,15 @@ public class TradeService(
             throw new ArgumentException(
                 $"A single import can contain at most {MaxImportSize} trades.");
 
+        ValidatePointValue(request.PointValue);
+        ValidateCommissionPerSide(request.CommissionPerSide);
+
         var trades = new List<Trade>(request.Trades.Count);
 
         foreach (var item in request.Trades)
         {
             ValidateImportItem(item);
-            trades.Add(item.ToEntity(userId, market));
+            trades.Add(item.ToEntity(userId, market, request.PointValue, request.CommissionPerSide));
         }
 
         await repository.AddRangeAsync(trades);
@@ -125,6 +132,18 @@ public class TradeService(
             throw new ArgumentException("Commission per unit must be a non-negative number.");
     }
 
+    private static void ValidateCommissionPerSide(decimal commissionPerSide)
+    {
+        if (commissionPerSide < 0)
+            throw new ArgumentException("Commission per side must be a non-negative number.");
+    }
+
+    private static void ValidatePointValue(decimal pointValue)
+    {
+        if (pointValue <= 0)
+            throw new ArgumentException("Point value must be a number greater than zero.");
+    }
+
     private static void ValidateImportItem(ImportTradeItem item)
     {
         if (string.IsNullOrWhiteSpace(item.Instrument))
@@ -141,9 +160,6 @@ public class TradeService(
 
         if (item.ExitTime < item.EntryTime)
             throw new ArgumentException("Exit time cannot be before the entry time.");
-
-        if (item.CommissionPerSide < 0)
-            throw new ArgumentException("Commission per side must be a non-negative number.");
     }
 
     /// <summary>Upper bound on a single import to keep request payloads sane.</summary>

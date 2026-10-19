@@ -24,6 +24,9 @@ public class Trade
     public decimal ExitPrice { get; set; }
     public int Quantity { get; set; }
 
+    /// <summary>Value of one price point per unit (for example 2 for MNQ, 1 for shares).</summary>
+    public decimal PointValue { get; set; } = 1m;
+
     public DateTime EntryTime { get; set; }
     public DateTime ExitTime { get; set; } 
     

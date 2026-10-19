@@ -35,6 +35,8 @@ interface ParsedFile {
     fileName: string;
     trades: ImportTradeItem[];
     instrument: string;
+    pointValue: number;
+    commissionPerSide: number;
 }
 
 /** A round trip pays commission on both the entry and the exit. */
@@ -44,6 +46,7 @@ const COMMISSION_SIDES = 2;
 const SCHEMA_EXAMPLE = `{
   "meta": {
     "instrument": "MNQ",
+    "pointValue": 2,
     "commissionPerSide": 1
   },
   "summary": {
@@ -58,8 +61,7 @@ const SCHEMA_EXAMPLE = `{
       "entryPrice": 14824.98,
       "exitPrice": 14844.98,
       "entryTime": "2021-07-11T22:00:00.000Z",
-      "exitTime": "2021-07-11T22:05:00.000Z",
-      "commissionPerSide": 1
+      "exitTime": "2021-07-11T22:05:00.000Z"
     }
   ]
 }`;
@@ -94,9 +96,8 @@ export function ImportTradesDialog({ open, onOpenChange }: ImportTradesDialogPro
     );
 
     const totalCommission = parsed
-        ? parsed.trades.reduce(
-              (sum, trade) =>
-                  sum + trade.commissionPerSide * COMMISSION_SIDES * trade.quantity,
+        ? parsed.commissionPerSide * COMMISSION_SIDES * parsed.trades.reduce(
+              (sum, trade) => sum + trade.quantity,
               0
           )
         : 0;
@@ -126,6 +127,8 @@ export function ImportTradesDialog({ open, onOpenChange }: ImportTradesDialogPro
                 fileName: file.name,
                 trades: preview.trades,
                 instrument: preview.instrument,
+                pointValue: preview.pointValue,
+                commissionPerSide: preview.commissionPerSide,
             });
         } catch (parseError) {
             setFileError(
@@ -151,7 +154,12 @@ export function ImportTradesDialog({ open, onOpenChange }: ImportTradesDialogPro
         }
 
         try {
-            await importTrades.mutateAsync({ marketId: market, trades: parsed.trades });
+            await importTrades.mutateAsync({
+                marketId: market,
+                pointValue: parsed.pointValue,
+                commissionPerSide: parsed.commissionPerSide,
+                trades: parsed.trades,
+            });
             onOpenChange(false);
         } catch (submitError) {
             setError(getErrorMessage(submitError));
@@ -237,6 +245,12 @@ export function ImportTradesDialog({ open, onOpenChange }: ImportTradesDialogPro
                                 <span>Instrument</span>
                                 <span className="font-medium text-foreground">
                                     {parsed.instrument}
+                                </span>
+                            </div>
+                            <div className="flex justify-between gap-4 text-muted-foreground">
+                                <span>Point value</span>
+                                <span className="font-medium text-foreground">
+                                    {parsed.pointValue}
                                 </span>
                             </div>
                             <div className="flex justify-between gap-4 text-muted-foreground">

@@ -148,6 +148,7 @@ def test_trades(token):
         "entryPrice": 23456.25,
         "exitPrice": 23468.75,
         "quantity": 2,
+        "pointValue": 2,
         "entryTime": "2026-07-05T10:00:00Z",
         "exitTime": "2026-07-05T10:15:00Z",
         "marketId": 1,

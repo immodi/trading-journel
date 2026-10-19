@@ -45,6 +45,8 @@ export interface Trade {
     entryPrice: number;
     exitPrice: number;
     quantity: number;
+    /** Value of one price point per unit (for example 2 for MNQ, 1 for shares). */
+    pointValue: number;
     entryTime: string;
     exitTime: string;
     /** Flat commission charged per unit for the full round trip (per side × 2). */
@@ -70,6 +72,8 @@ export interface CreateTradeInput {
     entryPrice: number;
     exitPrice: number;
     quantity: number;
+    /** Value of one price point per unit; must be greater than zero. */
+    pointValue: number;
     entryTime: string;
     exitTime: string;
     /** The market the trade belongs to; its currency is inherited by the trade. */
@@ -89,12 +93,14 @@ export interface ImportTradeItem {
     exitPrice: number;
     entryTime: string;
     exitTime: string;
-    /** Commission charged per side; the server doubles it for the round trip. */
-    commissionPerSide: number;
 }
 
 export interface ImportTradesInput {
     /** Every imported trade is filed under this market. */
     marketId: number;
+    /** Point value from the export meta; applies to every imported trade. */
+    pointValue: number;
+    /** Per-side commission from the export meta; applies to every imported trade. */
+    commissionPerSide: number;
     trades: ImportTradeItem[];
 }

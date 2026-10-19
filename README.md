@@ -29,16 +29,17 @@ EF Core persistence layer with migrations, and a test suite wired into CI.
 - **Markets** — create, edit, and delete markets. Each market carries a single
   currency that every trade in it inherits.
 - **Trade journal** — create, edit, and delete trades with instrument,
-  direction (Long/Short), quantity, entry/exit prices, entry/exit times, and an
-  association to a market.
+  direction (Long/Short), quantity, point value, entry/exit prices, entry/exit
+  times, and an association to a market.
 - **Trade import** — bulk-add trades from a `TradeReplay`-style JSON export
-  under a market you choose; every row inherits that market's currency. Invalid
-  files and rows are rejected with a clear message before anything is written.
+  under a market you choose; every row inherits that market's currency and the
+  export meta's point value and per-side commission. Invalid files and rows are
+  rejected with a clear message before anything is written.
 - **Server-side P/L** — profit/loss is calculated by the API from entry/exit
-  prices, quantity, and commission, so every client shows identical numbers.
-  You supply a per-side commission on create, edit, or import and the server
-  derives the total (`per side × 2 × quantity`); input is validated on both
-  ends.
+  prices, quantity, point value, and commission, so every client shows identical
+  numbers. You supply a point value and a per-side commission on create, edit,
+  or import and the server derives the total (`per side × 2 × quantity`); input
+  is validated on both ends.
 - **Dashboard** — net P/L, win rate, profit factor, average win, average loss,
   total trades, commission, plus a dependency-free SVG equity curve and a
   recent-trades table. All metrics are derived from your trade history.
@@ -181,7 +182,7 @@ operate on the caller's own data.
 | `GET` | `/api/trade` | List the current user's trades |
 | `GET` | `/api/trade/{id}` | Get a single trade |
 | `POST` | `/api/trade` | Create a trade |
-| `POST` | `/api/trade/import` | Bulk-import trades into a market (`{ marketId, trades }`) |
+| `POST` | `/api/trade/import` | Bulk-import trades into a market (`{ marketId, pointValue, commissionPerSide, trades }`) |
 | `PUT` | `/api/trade/{id}` | Update a trade |
 | `DELETE` | `/api/trade/{id}` | Delete a trade |
 
