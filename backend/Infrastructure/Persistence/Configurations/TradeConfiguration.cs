@@ -25,6 +25,9 @@ public class TradeConfiguration : IEntityTypeConfiguration<Trade>
         builder.Property(t => t.ExitPrice)
             .HasPrecision(18, 4);
 
+        builder.Property(t => t.PointValue)
+            .HasPrecision(18, 4);
+
         builder.Property(t => t.CommissionPerUnit)
             .HasPrecision(18, 4);
 

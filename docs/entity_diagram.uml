@@ -34,6 +34,7 @@ entity "Trade" as Trade {
   Instrument : string(20)
   Direction : Direction
   Quantity : int
+  PointValue : decimal(18,4)
   EntryPrice : decimal(18,4)
   ExitPrice : decimal(18,4)
   EntryTime : datetime
@@ -59,7 +60,8 @@ Trade ..> Direction : stored as int
 legend right
   == Storage ==
   SQLite via EF Core 10
-  Migrations: InitialCreate, AddMarketsAndCommissionPerUnit
+  Migrations: InitialCreate, AddMarketsAndCommissionPerUnit,
+  AddPointValue
 
   == Rules ==
   Username and Email are unique.
@@ -67,12 +69,13 @@ legend right
   Currency is a 3-letter ISO 4217 code.
   A trade always belongs to a market and
   inherits its currency.
-  CommissionPerSide is user supplied on create,
-  edit, and import (per side of the round trip).
+  PointValue and CommissionPerSide are user
+  supplied on create, edit, and import
+  (CommissionPerSide per side of the round trip).
   CommissionPerUnit = CommissionPerSide x 2
   Commission = CommissionPerUnit x Quantity
-  ProfitLoss = (Exit - Entry) x Quantity - Commission
-  (Entry - Exit for Short).
+  ProfitLoss = (Exit - Entry) x Quantity x PointValue
+  - Commission (Entry - Exit for Short).
   Deleting a user cascades to their markets and trades.
   Deleting a market with trades is refused (409).
 

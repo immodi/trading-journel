@@ -25,6 +25,7 @@ function makeTrade(overrides: Partial<Trade> = {}): Trade {
         entryPrice: 100,
         exitPrice: 110,
         quantity: 1,
+        pointValue: 1,
         entryTime: "2026-01-01T09:30:00.000Z",
         exitTime: "2026-01-01T10:00:00.000Z",
         commissionPerUnit: 0,

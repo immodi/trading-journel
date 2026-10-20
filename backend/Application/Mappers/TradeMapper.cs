@@ -27,6 +27,7 @@ public static class TradeMapper
             UpdatedAt = trade.UpdatedAt,
             ExitPrice = trade.ExitPrice,
             Quantity = trade.Quantity,
+            PointValue = trade.PointValue,
             ProfitLoss = trade.ProfitLoss
         };
     }
@@ -44,6 +45,7 @@ public static class TradeMapper
             EntryPrice = request.EntryPrice,
             ExitPrice = request.ExitPrice,
             Quantity = request.Quantity,
+            PointValue = request.PointValue,
             EntryTime = request.EntryTime,
             ExitTime = request.ExitTime,
             CommissionPerUnit = request.CommissionPerUnit,
@@ -52,17 +54,23 @@ public static class TradeMapper
                 request.Direction, 
                 request.EntryPrice, 
                 request.ExitPrice, 
-                request.Quantity, 
+                request.Quantity,
+                request.PointValue,
                 commission)
         };
     }
 
     /// <summary>
-    /// Builds a trade from an imported export row. Imported rows carry a
-    /// per-side commission, so the stored per-unit rate is doubled before the
-    /// normal create mapping runs.
+    /// Builds a trade from an imported export row using the export meta's point
+    /// value and per-side commission. The stored per-unit rate is the per-side
+    /// rate doubled because a round trip is charged on both sides.
     /// </summary>
-    public static Trade ToEntity(this ImportTradeItem request, int userId, Market market) =>
+    public static Trade ToEntity(
+        this ImportTradeItem request,
+        int userId,
+        Market market,
+        decimal pointValue,
+        decimal commissionPerSide) =>
         new CreateTradeRequest
         {
             Instrument = request.Instrument,
@@ -70,10 +78,11 @@ public static class TradeMapper
             EntryPrice = request.EntryPrice,
             ExitPrice = request.ExitPrice,
             Quantity = request.Quantity,
+            PointValue = pointValue,
             EntryTime = request.EntryTime,
             ExitTime = request.ExitTime,
             MarketId = market.Id,
-            CommissionPerUnit = request.CommissionPerSide * CommissionSidesPerRoundTrip,
+            CommissionPerUnit = commissionPerSide * CommissionSidesPerRoundTrip,
         }.ToEntity(userId, market);
     
     public static void UpdateTrade(this UpdateTradeRequest request, Trade trade)
@@ -92,6 +101,9 @@ public static class TradeMapper
 
         if (request.Quantity.HasValue)
             trade.Quantity = request.Quantity.Value;
+
+        if (request.PointValue.HasValue)
+            trade.PointValue = request.PointValue.Value;
 
         if (request.EntryTime.HasValue)
             trade.EntryTime = request.EntryTime.Value;
@@ -114,6 +126,7 @@ public static class TradeMapper
             trade.EntryPrice,
             trade.ExitPrice,
             trade.Quantity,
+            trade.PointValue,
             trade.Commission);
 
         trade.UpdatedAt = DateTime.UtcNow;
@@ -138,15 +151,16 @@ public static class TradeMapper
         decimal entryPrice,
         decimal exitPrice,
         int quantity,
+        decimal pointValue,
         decimal commission)
     {
-        var pnl = direction switch
+        var priceMove = direction switch
         {
             Direction.Long => (exitPrice - entryPrice) * quantity,
             Direction.Short => (entryPrice - exitPrice) * quantity,
             _ => throw new ArgumentOutOfRangeException(nameof(direction))
         };
 
-        return pnl - commission;
+        return priceMove * pointValue - commission;
     }
 }

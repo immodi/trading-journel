@@ -23,6 +23,9 @@ public class TradeDto
     public decimal ExitPrice { get; init; }
     public int Quantity { get; init; }
 
+    /// <summary>Value of one price point per unit; multiplies the price move.</summary>
+    public decimal PointValue { get; init; }
+
     public DateTime EntryTime { get; init; }
     public DateTime ExitTime { get; init; }
 

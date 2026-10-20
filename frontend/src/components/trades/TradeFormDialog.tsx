@@ -40,6 +40,7 @@ interface FormState {
     quantity: string;
     entryPrice: string;
     exitPrice: string;
+    pointValue: string;
     entryTime: string;
     exitTime: string;
     commissionPerSide: string;
@@ -51,6 +52,9 @@ const DIRECTION_ITEMS = {
 };
 
 const DEFAULT_COMMISSION_PER_SIDE = "0";
+
+/** Shares move one currency unit per point; futures override this (e.g. 2 for MNQ). */
+const DEFAULT_POINT_VALUE = "1";
 
 /**
  * A round trip pays commission on both the entry and the exit, so the total is
@@ -72,6 +76,7 @@ function initialForm(trade?: Trade | null): FormState {
             quantity: "1",
             entryPrice: "",
             exitPrice: "",
+            pointValue: DEFAULT_POINT_VALUE,
             entryTime: nowAsDateTimeLocal(),
             exitTime: nowAsDateTimeLocal(),
             commissionPerSide: DEFAULT_COMMISSION_PER_SIDE,
@@ -85,6 +90,7 @@ function initialForm(trade?: Trade | null): FormState {
         quantity: String(trade.quantity),
         entryPrice: String(trade.entryPrice),
         exitPrice: String(trade.exitPrice),
+        pointValue: String(round4(trade.pointValue)),
         entryTime: toDateTimeLocal(trade.entryTime),
         exitTime: toDateTimeLocal(trade.exitTime),
         commissionPerSide: String(round4(trade.commissionPerUnit / COMMISSION_SIDES)),
@@ -140,6 +146,8 @@ export function TradeFormDialog({ open, onOpenChange, trade }: TradeFormDialogPr
         const quantityValue = Number(form.quantity);
         const entryPrice = Number(form.entryPrice);
         const exitPrice = Number(form.exitPrice);
+        const pointValue =
+            form.pointValue.trim() === "" ? NaN : Number(form.pointValue);
         const marketId = Number(effectiveMarketId);
         const perSide =
             form.commissionPerSide.trim() === "" ? 0 : Number(form.commissionPerSide);
@@ -164,6 +172,10 @@ export function TradeFormDialog({ open, onOpenChange, trade }: TradeFormDialogPr
             setError("Exit price must be a non-negative number.");
             return;
         }
+        if (!Number.isFinite(pointValue) || pointValue <= 0) {
+            setError("Point value must be a number greater than zero.");
+            return;
+        }
         if (!Number.isFinite(perSide) || perSide < 0) {
             setError("Commission per side must be a non-negative number.");
             return;
@@ -184,6 +196,7 @@ export function TradeFormDialog({ open, onOpenChange, trade }: TradeFormDialogPr
             quantity: quantityValue,
             entryPrice,
             exitPrice,
+            pointValue: round4(pointValue),
             entryTime: fromDateTimeLocal(form.entryTime),
             exitTime: fromDateTimeLocal(form.exitTime),
             commissionPerUnit: round4(perSide * COMMISSION_SIDES),
@@ -293,6 +306,24 @@ export function TradeFormDialog({ open, onOpenChange, trade }: TradeFormDialogPr
                         </div>
 
                         <div className="grid gap-2">
+                            <Label htmlFor="pointValue">Point value</Label>
+                            <Input
+                                id="pointValue"
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                placeholder="1"
+                                value={form.pointValue}
+                                onChange={(event) =>
+                                    update("pointValue", event.target.value)
+                                }
+                            />
+                            <p className="text-xs text-muted-foreground">
+                                Value of one point per unit — 2 for MNQ, 1 for shares.
+                            </p>
+                        </div>
+
+                        <div className="grid gap-2">
                             <Label htmlFor="entryPrice">Entry price</Label>
                             <Input
                                 id="entryPrice"
@@ -338,7 +369,7 @@ export function TradeFormDialog({ open, onOpenChange, trade }: TradeFormDialogPr
                             />
                         </div>
 
-                        <div className="grid gap-2 sm:col-span-2">
+                        <div className="grid gap-2">
                             <Label htmlFor="commissionPerSide">Commission per side</Label>
                             <Input
                                 id="commissionPerSide"

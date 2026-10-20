@@ -13,6 +13,10 @@ export interface TradeImportPreview {
     trades: ImportTradeItem[];
     /** The instrument from the export meta, falling back to the first trade. */
     instrument: string;
+    /** Point value from the export meta; applies to every imported trade. */
+    pointValue: number;
+    /** Per-side commission from the export meta; applies to every imported trade. */
+    commissionPerSide: number;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -100,7 +104,20 @@ export function parseTradeExport(raw: unknown): TradeImportPreview {
         typeof meta?.instrument === "string"
             ? meta.instrument.trim().toUpperCase()
             : "";
-    const metaPerSide = optionalNumber(meta?.commissionPerSide);
+
+    const pointValue = optionalNumber(meta?.pointValue) ?? 1;
+
+    if (pointValue <= 0) {
+        throw new TradeImportError('"meta.pointValue" must be greater than zero.');
+    }
+
+    const commissionPerSide = optionalNumber(meta?.commissionPerSide) ?? 0;
+
+    if (commissionPerSide < 0) {
+        throw new TradeImportError(
+            '"meta.commissionPerSide" cannot be negative.'
+        );
+    }
 
     const trades = root.trades.map((rawTrade, index): ImportTradeItem => {
         const trade = asRecord(rawTrade);
@@ -135,15 +152,6 @@ export function parseTradeExport(raw: unknown): TradeImportPreview {
             throw new TradeImportError(`Trade #${index + 1} prices cannot be negative.`);
         }
 
-        const commissionPerSide =
-            optionalNumber(trade.commissionPerSide) ?? metaPerSide ?? 0;
-
-        if (commissionPerSide < 0) {
-            throw new TradeImportError(
-                `Trade #${index + 1} commission cannot be negative.`
-            );
-        }
-
         const entryTime = parseTime(
             trade.entryTime,
             trade.entryTimeUnix,
@@ -171,12 +179,13 @@ export function parseTradeExport(raw: unknown): TradeImportPreview {
             exitPrice,
             entryTime,
             exitTime,
-            commissionPerSide,
         };
     });
 
     return {
         trades,
         instrument: metaInstrument || trades[0].instrument,
+        pointValue,
+        commissionPerSide,
     };
 }
